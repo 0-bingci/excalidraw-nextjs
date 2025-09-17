@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-
+import * as fabric from "fabric";
 import { useState, useRef, useEffect } from "react";
 import {
   MousePointer2,
@@ -52,14 +52,68 @@ interface DrawingElement {
 
 export default function ExcalidrawClone() {
   const [selectedTool, setSelectedTool] = useState<Tool>("select");
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [elements, setElements] = useState<DrawingElement[]>([]);
-  const [zoom, setZoom] = useState(100);
   const [isLocked, setIsLocked] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [showLibrary, setShowLibrary] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const fabricCanvasRef = useRef<fabric.Canvas | null>(null); // 保存Fabric画布实例的引用
+  const canvas = useRef<fabric.Canvas | null>(null);
+  const zoom = 100;
+  
+  useEffect(() => {
+    // 确保canvas元素已存在
+    if (!canvasRef.current) return;
+
+    // 初始化Fabric画布，使用ref而不是id
+    canvas.current = new fabric.Canvas(canvasRef.current, {
+      backgroundColor: "#f0f0f0", 
+      isDrawingMode: false,
+      preserveObjectStacking: true,
+      centeredScaling: true,
+      selection: false,
+    });
+
+    // 设置画布尺寸以匹配容器
+    const setCanvasDimensions = () => {
+      if (canvasRef.current && canvas.current) {
+        if (containerRef.current) {
+          const { width, height } = containerRef.current.getBoundingClientRect();
+          canvas.current.setWidth(width);
+          canvas.current.setHeight(height);
+          canvas.current.renderAll();
+        }
+      }
+    };
+
+    // 初始化尺寸
+    setCanvasDimensions();
+    
+    // 监听窗口大小变化，调整画布尺寸
+    window.addEventListener('resize', setCanvasDimensions);
+    
+    // 保存画布实例
+    fabricCanvasRef.current = canvas.current;
+
+    // 清理函数
+    return () => {
+      window.removeEventListener('resize', setCanvasDimensions);
+      fabricCanvasRef.current?.dispose();
+      fabricCanvasRef.current = null;
+    };
+  }, []);
+  useEffect(() => { 
+    console.log("selectedTool:", selectedTool);
+    if (selectedTool === "select") {
+      canvas.current.isDrawingMode = false;
+    } else if (selectedTool === "pen") {
+      if (canvasRef.current) {
+        canvas.current.isDrawingMode = true;
+        canvas.current.freeDrawingBrush = new fabric.PencilBrush(canvas.current);
+        canvas.current.freeDrawingBrush.strokeWidth = 4;
+      }
+    }
+  }, [selectedTool]);
 
   const tools = [
     { id: "select", icon: MousePointer2, label: "选择" },
@@ -74,167 +128,6 @@ export default function ExcalidrawClone() {
     { id: "image", icon: ImageIcon, label: "图片" },
     { id: "eraser", icon: Eraser2, label: "橡皮擦" },
   ];
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (selectedTool === "select" || selectedTool === "hand") return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    setIsDrawing(true);
-    setStartPoint({ x, y });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
-
-    // 清除画布并重绘所有元素
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 重绘现有元素
-    elements.forEach((element) => {
-      drawElement(ctx, element);
-    });
-
-    // 绘制当前正在绘制的元素
-    drawCurrentElement(ctx, startPoint.x, startPoint.y, currentX, currentY);
-  };
-
-  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const endX = e.clientX - rect.left;
-    const endY = e.clientY - rect.top;
-
-    const newElement: DrawingElement = {
-      id: Date.now().toString(),
-      type: selectedTool,
-      x: Math.min(startPoint.x, endX),
-      y: Math.min(startPoint.y, endY),
-      width: Math.abs(endX - startPoint.x),
-      height: Math.abs(endY - startPoint.y),
-      strokeColor: "#000000",
-      fillColor: "transparent",
-      strokeWidth: 2,
-    };
-
-    setElements((prev) => [...prev, newElement]);
-    setIsDrawing(false);
-  };
-
-  const drawElement = (
-    ctx: CanvasRenderingContext2D,
-    element: DrawingElement
-  ) => {
-    ctx.strokeStyle = element.strokeColor;
-    ctx.fillStyle = element.fillColor;
-    ctx.lineWidth = element.strokeWidth;
-
-    switch (element.type) {
-      case "rectangle":
-        ctx.strokeRect(element.x, element.y, element.width, element.height);
-        if (element.fillColor !== "transparent") {
-          ctx.fillRect(element.x, element.y, element.width, element.height);
-        }
-        break;
-      case "circle":
-        ctx.beginPath();
-        const radius = Math.min(element.width, element.height) / 2;
-        ctx.arc(
-          element.x + element.width / 2,
-          element.y + element.height / 2,
-          radius,
-          0,
-          2 * Math.PI
-        );
-        ctx.stroke();
-        if (element.fillColor !== "transparent") {
-          ctx.fill();
-        }
-        break;
-      case "line":
-        ctx.beginPath();
-        ctx.moveTo(element.x, element.y);
-        ctx.lineTo(element.x + element.width, element.y + element.height);
-        ctx.stroke();
-        break;
-    }
-  };
-
-  const drawCurrentElement = (
-    ctx: CanvasRenderingContext2D,
-    startX: number,
-    startY: number,
-    currentX: number,
-    currentY: number
-  ) => {
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 2;
-
-    switch (selectedTool) {
-      case "rectangle":
-        const width = currentX - startX;
-        const height = currentY - startY;
-        ctx.strokeRect(startX, startY, width, height);
-        break;
-      case "circle":
-        ctx.beginPath();
-        const radius =
-          Math.min(Math.abs(currentX - startX), Math.abs(currentY - startY)) /
-          2;
-        ctx.arc(
-          startX + (currentX - startX) / 2,
-          startY + (currentY - startY) / 2,
-          radius,
-          0,
-          2 * Math.PI
-        );
-        ctx.stroke();
-        break;
-      case "line":
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(currentX, currentY);
-        ctx.stroke();
-        break;
-    }
-  };
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // 设置画布大小
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    // 重绘所有元素
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    elements.forEach((element) => {
-      drawElement(ctx, element);
-    });
-  }, [elements]);
 
   return (
     <div className="h-screen w-screen bg-gray-50 overflow-hidden">
@@ -307,7 +200,6 @@ export default function ExcalidrawClone() {
       <div className="absolute top-4 right-4 z-10 flex items-center gap-3">
         {/* 素材库按钮 */}
         <button
-          onClick={() => setShowLibrary(!showLibrary)}
           className={`px-4 py-2 rounded-lg shadow-lg transition-all duration-200 flex items-center gap-2 font-medium ${
             showLibrary
               ? "bg-purple-600 hover:bg-purple-700 text-white"
@@ -343,7 +235,6 @@ export default function ExcalidrawClone() {
       <div className="absolute bottom-4 left-4 z-10">
         <div className="bg-white rounded-lg shadow-lg border border-gray-200 px-2 py-2 flex items-center gap-1">
           <button
-            onClick={() => setZoom(Math.max(10, zoom - 10))}
             className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-md transition-all duration-150 group"
             title="缩小"
           >
@@ -353,14 +244,12 @@ export default function ExcalidrawClone() {
             />
           </button>
           <button
-            onClick={() => setZoom(100)}
             className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200 rounded transition-all duration-150 min-w-[50px] text-center font-medium"
             title="重置缩放"
           >
             {zoom}%
           </button>
           <button
-            onClick={() => setZoom(Math.min(500, zoom + 10))}
             className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-md transition-all duration-150 group"
             title="放大"
           >
@@ -377,7 +266,6 @@ export default function ExcalidrawClone() {
           <button
             className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-md transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed"
             title="撤销"
-            disabled={elements.length === 0}
           >
             <Undo
               size={16}
@@ -398,31 +286,12 @@ export default function ExcalidrawClone() {
       </div>
 
       {/* 画布区域 */}
-      <div className="relative w-full h-full">
-        {/* 提示文本 */}
-        {elements.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <p className="text-gray-400 text-lg">
-              要开始绘图，请选择任意标准或绘图工具并拖拽鼠标，或者用手工具。
-            </p>
-          </div>
-        )}
-
+      <div className="relative w-1000 h-full" id="canvasContainer" ref={containerRef}>
         {/* 画布 */}
         <canvas
+          id="stageCanvas"
           ref={canvasRef}
           className="absolute inset-0 cursor-crosshair"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          style={{
-            cursor:
-              selectedTool === "hand"
-                ? "grab"
-                : selectedTool === "select"
-                ? "default"
-                : "crosshair",
-          }}
         />
       </div>
     </div>
