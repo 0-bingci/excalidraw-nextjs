@@ -3,6 +3,7 @@
 import type React from "react";
 import * as fabric from "fabric";
 import { useState, useRef, useEffect } from "react";
+import { saveDrawing, getLatestDrawing, clearAllDrawings } from '@/utils/indexedDB';
 import {
   MousePointer2,
   Hand,
@@ -38,23 +39,12 @@ type Tool =
   | "image"
   | "eraser";
 
-interface DrawingElement {
-  id: string;
-  type: Tool;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  strokeColor: string;
-  fillColor: string;
-  strokeWidth: number;
-}
-
 export default function ExcalidrawClone() {
   const [selectedTool, setSelectedTool] = useState<Tool>("select");
   const [isLocked, setIsLocked] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [isCanvasReady, setIsCanvasReady] = useState(false); // 初始化完成标记
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null); // 保存Fabric画布实例的引用
@@ -72,6 +62,10 @@ export default function ExcalidrawClone() {
       preserveObjectStacking: true,
       centeredScaling: true,
       selection: false,
+    });
+    // 初始化完成后标记
+    canvas.current.on('after:render', () => {
+      setIsCanvasReady(true); // 监听首次渲染完成事件
     });
 
     // 设置画布尺寸以匹配容器
@@ -91,7 +85,18 @@ export default function ExcalidrawClone() {
     
     // 监听窗口大小变化，调整画布尺寸
     window.addEventListener('resize', setCanvasDimensions);
-    
+    getLatestDrawing().then((b) => {
+        canvas.current!.loadFromJSON(b.data, () => {
+          // 关键：加载后强制校准偏移 + 重绘
+          canvas.current!.calcOffset(); // 校准画布偏移（解决“渲染在视口外”问题）
+          canvas.current!.renderAll(); 
+          // 额外保险：触发一次画布尺寸重算
+          canvas.current!.setDimensions({
+            width: canvasRef.current?.clientWidth || 800,
+            height: canvasRef.current?.clientHeight || 600,
+          });
+        });
+      });
     // 保存画布实例
     fabricCanvasRef.current = canvas.current;
 
@@ -102,18 +107,30 @@ export default function ExcalidrawClone() {
       fabricCanvasRef.current = null;
     };
   }, []);
-  useEffect(() => { 
-    console.log("selectedTool:", selectedTool);
+  useEffect(() => {
+    if (!canvas.current || !isCanvasReady) return; // 未就绪则不执行
     if (selectedTool === "select") {
       canvas.current.isDrawingMode = false;
     } else if (selectedTool === "pen") {
-      if (canvasRef.current) {
-        canvas.current.isDrawingMode = true;
-        canvas.current.freeDrawingBrush = new fabric.PencilBrush(canvas.current);
-        canvas.current.freeDrawingBrush.strokeWidth = 4;
-      }
+      canvas.current.isDrawingMode = true;
+      canvas.current.freeDrawingBrush = new fabric.PencilBrush(canvas.current);
+      canvas.current.freeDrawingBrush.strokeWidth = 4;
+    } else{
+      canvas.current.isDrawingMode = false;
     }
-  }, [selectedTool]);
+  }, [selectedTool, isCanvasReady]); // 依赖增加 isCanvasReady
+  useEffect(() => {
+  if (!canvas.current || !isCanvasReady) return;
+
+  // 合并为 2 个监听：通用修改 + 特殊操作
+  canvas.current.on('path:created',  () => {
+    const a = canvas.current.toJSON();
+    saveDrawing(a);
+  }); // 替代 add/modify/remove
+  return () => {
+    canvas.current?.off('path:created', () => {});
+  };
+}, [isCanvasReady]);
 
   const tools = [
     { id: "select", icon: MousePointer2, label: "选择" },
