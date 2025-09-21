@@ -3,7 +3,18 @@
 import type React from "react";
 import * as fabric from "fabric";
 import { useState, useRef, useEffect } from "react";
-import { saveDrawing, getLatestDrawing, clearAllDrawings } from '@/utils/indexedDB';
+import {
+  saveDrawing,
+  getLatestDrawing,
+  clearAllDrawings,
+} from "@/utils/indexedDB";
+import {
+  initHistoryManager,
+  destroyHistoryManager,
+  undo,
+  redo,
+  clearHistoryFromDB,
+} from "@/utils/history";
 import {
   MousePointer2,
   Hand,
@@ -50,21 +61,20 @@ export default function ExcalidrawClone() {
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null); // 保存Fabric画布实例的引用
   const canvas = useRef<fabric.Canvas | null>(null);
   const zoom = 100;
-  
+
   useEffect(() => {
     // 确保canvas元素已存在
     if (!canvasRef.current) return;
-
     // 初始化Fabric画布，使用ref而不是id
     canvas.current = new fabric.Canvas(canvasRef.current, {
-      backgroundColor: "#f0f0f0", 
+      backgroundColor: "#f0f0f0",
       isDrawingMode: false,
       preserveObjectStacking: true,
       centeredScaling: true,
       selection: false,
     });
     // 初始化完成后标记
-    canvas.current.on('after:render', () => {
+    canvas.current.on("after:render", () => {
       setIsCanvasReady(true); // 监听首次渲染完成事件
     });
 
@@ -72,7 +82,8 @@ export default function ExcalidrawClone() {
     const setCanvasDimensions = () => {
       if (canvasRef.current && canvas.current) {
         if (containerRef.current) {
-          const { width, height } = containerRef.current.getBoundingClientRect();
+          const { width, height } =
+            containerRef.current.getBoundingClientRect();
           canvas.current.setWidth(width);
           canvas.current.setHeight(height);
           canvas.current.renderAll();
@@ -82,29 +93,33 @@ export default function ExcalidrawClone() {
 
     // 初始化尺寸
     setCanvasDimensions();
-    
+
     // 监听窗口大小变化，调整画布尺寸
-    window.addEventListener('resize', setCanvasDimensions);
+    window.addEventListener("resize", setCanvasDimensions);
     getLatestDrawing().then((b) => {
-        canvas.current!.loadFromJSON(b.data, () => {
-          // 关键：加载后强制校准偏移 + 重绘
-          canvas.current!.calcOffset(); // 校准画布偏移（解决“渲染在视口外”问题）
-          canvas.current!.renderAll(); 
-          // 额外保险：触发一次画布尺寸重算
-          canvas.current!.setDimensions({
-            width: canvasRef.current?.clientWidth || 800,
-            height: canvasRef.current?.clientHeight || 600,
-          });
+      canvas.current!.loadFromJSON(b.data, () => {
+        // 关键：加载后强制校准偏移 + 重绘
+        canvas.current!.calcOffset(); // 校准画布偏移（解决“渲染在视口外”问题）
+        canvas.current!.renderAll();
+        // 额外保险：触发一次画布尺寸重算
+        canvas.current!.setDimensions({
+          width: canvasRef.current?.clientWidth || 800,
+          height: canvasRef.current?.clientHeight || 600,
         });
       });
+    });
     // 保存画布实例
     fabricCanvasRef.current = canvas.current;
+    if (canvas.current) {
+      initHistoryManager(canvas.current);
+    }
 
     // 清理函数
     return () => {
-      window.removeEventListener('resize', setCanvasDimensions);
+      window.removeEventListener("resize", setCanvasDimensions);
       fabricCanvasRef.current?.dispose();
       fabricCanvasRef.current = null;
+      destroyHistoryManager();
     };
   }, []);
   useEffect(() => {
@@ -115,22 +130,22 @@ export default function ExcalidrawClone() {
       canvas.current.isDrawingMode = true;
       canvas.current.freeDrawingBrush = new fabric.PencilBrush(canvas.current);
       canvas.current.freeDrawingBrush.strokeWidth = 4;
-    } else{
+    } else {
       canvas.current.isDrawingMode = false;
     }
   }, [selectedTool, isCanvasReady]); // 依赖增加 isCanvasReady
   useEffect(() => {
-  if (!canvas.current || !isCanvasReady) return;
+    if (!canvas.current || !isCanvasReady) return;
 
-  // 合并为 2 个监听：通用修改 + 特殊操作
-  canvas.current.on('path:created',  () => {
-    const a = canvas.current.toJSON();
-    saveDrawing(a);
-  }); // 替代 add/modify/remove
-  return () => {
-    canvas.current?.off('path:created', () => {});
-  };
-}, [isCanvasReady]);
+    // 合并为 2 个监听：通用修改 + 特殊操作
+    canvas.current.on("path:created", () => {
+      const a = canvas.current.toJSON();
+      saveDrawing(a);
+    }); 
+    return () => {
+      canvas.current?.off("path:created", () => {});
+    };
+  }, [isCanvasReady]);
 
   const tools = [
     { id: "select", icon: MousePointer2, label: "选择" },
@@ -283,6 +298,7 @@ export default function ExcalidrawClone() {
           <button
             className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-md transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed"
             title="撤销"
+            onClick={undo}
           >
             <Undo
               size={16}
@@ -292,7 +308,8 @@ export default function ExcalidrawClone() {
           <button
             className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-md transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed"
             title="重做"
-            disabled={true}
+            // disabled={true}
+            onClick={redo}
           >
             <Redo
               size={16}
@@ -303,7 +320,11 @@ export default function ExcalidrawClone() {
       </div>
 
       {/* 画布区域 */}
-      <div className="relative w-1000 h-full" id="canvasContainer" ref={containerRef}>
+      <div
+        className="relative w-1000 h-full"
+        id="canvasContainer"
+        ref={containerRef}
+      >
         {/* 画布 */}
         <canvas
           id="stageCanvas"
