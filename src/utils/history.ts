@@ -102,13 +102,6 @@ const generateActionId = (): string => {
  */
 const handleObjectAdded = (object: fabric.Object) => {
   if (!canvas) return;
-  console.log("handleObjectAdded");
-  console.log(object.target.toJSON());
-
-  // 过滤画布初始化加载的对象（避免重复记录）
-  //   const isInitialLoad =
-  //     historyState.actions.length === 0 && historyState.currentIndex === -1;
-  //   if (isInitialLoad) return;
   const id = generateActionId();
   if (!object.target.id) {
     object.target.set("id", id);
@@ -122,24 +115,10 @@ const handleObjectAdded = (object: fabric.Object) => {
       object: object.target.toJSON(), // 仅存储对象序列化数据（增量）
     },
   };
-
-  // 清除当前索引之后的历史（避免分支历史）
-  // if (historyState.currentIndex < historyState.actions.length - 1) {
-  //   console.log(historyState.actions,historyState.currentIndex);
-    
-  //   historyState.actions = historyState.actions.slice(
-  //     0,
-  //     historyState.currentIndex + 1
-  //   );
-  //   console.log(historyState.actions);
-    
-  // }
-
   // 添加到历史栈并更新状态
   historyState.actions.push(action);
   historyState.currentIndex = historyState.actions.length - 1;
   redoState.actions.length = 0; // 清空重做栈
-//   saveHistoryToDB(); // 异步保存到DB，不阻塞操作
 };
 
 /**
@@ -186,7 +165,7 @@ const handleObjectModified = (object: fabric.Object) => {
     // }
     historyState.actions.push(action);
     historyState.currentIndex = historyState.actions.length - 1;
-  redoState.actions.length = 0; // 清空重做栈
+    redoState.actions.length = 0; // 清空重做栈
 
     // 更新缓存的原始状态
     selectedObjectOldState[object.id] = newProps;
@@ -271,7 +250,7 @@ const pauseHistoryListening = () => {
   canvas.off("object:added", handleObjectAdded);
   canvas.off("object:modified", handleObjectModified);
   canvas.off("object:removed", handleObjectRemoved);
-  canvas.off("object:selected", handleObjectSelected);
+  //   canvas.off("object:selected", handleObjectSelected);
 };
 
 /**
@@ -282,26 +261,22 @@ const resumeHistoryListening = () => {
   canvas.on("object:added", handleObjectAdded);
   canvas.on("object:modified", handleObjectModified);
   canvas.on("object:removed", handleObjectRemoved);
-  canvas.on("object:selected", handleObjectSelected);
+  //   canvas.on("object:selected", handleObjectSelected);
 };
 
 /**
  * 撤销上一步操作
  */
 export const undo = async (): Promise<boolean> => {
-  if (!canvas || historyState.currentIndex < 0) return false; // 无操作可撤销
+  if (!canvas || historyState.actions.length < 0) return false; // 无操作可撤销
 
-  const action = historyState.actions[historyState.currentIndex];
+  const action = historyState.actions.pop();
   pauseHistoryListening();
 
   try {
     switch (action.type) {
       case "add": {
-        // 撤销新增：删除对应的对象
-        // const { object } = action.data as AddActionData;
-        console.log(action.id);
-
-        canvas.getObjects().find((o) => console.log(o));
+        canvas.getObjects().find((o) => console.log(o.id));
         const obj = canvas.getObjects().find((o) => o.id === action.id);
         console.log(obj);
 
@@ -326,6 +301,7 @@ export const undo = async (): Promise<boolean> => {
 
     // 更新历史索引并保存
     historyState.currentIndex -= 1;
+    redoState.actions.push(action);
     // await saveHistoryToDB();
     canvas.renderAll();
     return true;
@@ -341,24 +317,33 @@ export const undo = async (): Promise<boolean> => {
  * 重做上一步操作
  */
 export const redo = async (): Promise<boolean> => {
-  if (!canvas || historyState.currentIndex >= historyState.actions.length - 1)
-    return false; // 无操作可重做
+  if (!canvas || redoState.actions.length <= 0) return false; // 无操作可重做
 
-  const nextIndex = historyState.currentIndex + 1;
-  const action = historyState.actions[nextIndex];
   pauseHistoryListening();
+  console.log("redoState.actions:", redoState.actions);
+
+  const action = redoState.actions.pop();
+  console.log("redoState.actions:", redoState.actions, action);
 
   try {
     switch (action.type) {
       case "add": {
         const object = action.data.object;
-        const restoredObj = { ...object, type: object.type.toLowerCase() };
+        console.log(action);
 
-        fabric.util
+        const restoredObj = {
+          id: action.id,
+          ...object,
+          type: object.type.toLowerCase(),
+        };
+
+        await fabric.util
           .enlivenObjects([restoredObj])
           .then((objects) => {
             console.log("转换成功的对象：", objects); // 现在会触发
             if (objects.length > 0) {
+              console.log("objects[0]:", objects);
+
               canvas.add(objects[0]);
               canvas.renderAll();
             }
@@ -385,15 +370,19 @@ export const redo = async (): Promise<boolean> => {
     }
 
     // 更新历史索引并保存
-    historyState.currentIndex = nextIndex;
+    historyState.actions.push(action);
+    historyState.currentIndex += 1;
+
     // await saveHistoryToDB();
     canvas.renderAll();
+    console.log("redoState.actions:", redoState.actions);
     return true;
   } catch (error) {
     console.error("重做操作失败:", error);
     return false;
   } finally {
     resumeHistoryListening();
+    console.log("redoState.actions:", redoState.actions);
   }
 };
 
@@ -427,7 +416,7 @@ export const destroyHistoryManager = async () => {
     canvas.off("object:added", handleObjectAdded);
     canvas.off("object:modified", handleObjectModified);
     canvas.off("object:removed", handleObjectRemoved);
-    canvas.off("object:selected", handleObjectSelected);
+    // canvas.off("object:selected", handleObjectSelected);
   }
   canvas = null;
   selectedObjectOldState = {};

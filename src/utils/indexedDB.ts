@@ -84,7 +84,7 @@ export const saveCanvasData = async (canvas: Omit<CanvasData, 'id' | 'timestamp'
 
       const canvasData: CanvasData = {
         id: 'latest', // 固定 ID
-        ...canvas,
+        data:canvas,
         timestamp: new Date().toISOString()
       };
 

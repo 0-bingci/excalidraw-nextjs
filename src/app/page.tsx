@@ -3,17 +3,12 @@
 import type React from "react";
 import * as fabric from "fabric";
 import { useState, useRef, useEffect } from "react";
-import {
-  saveDrawing,
-  getLatestDrawing,
-  clearAllDrawings,
-} from "@/utils/indexedDB";
+import {saveCanvasData,getCanvasDataById} from "@/utils/indexedDB";
 import {
   initHistoryManager,
   destroyHistoryManager,
   undo,
   redo,
-  clearHistoryFromDB,
 } from "@/utils/history";
 import {
   MousePointer2,
@@ -96,7 +91,10 @@ export default function ExcalidrawClone() {
 
     // 监听窗口大小变化，调整画布尺寸
     window.addEventListener("resize", setCanvasDimensions);
-    getLatestDrawing().then((b) => {
+    getCanvasDataById('latest').then((b) => {
+      if(b){
+        console.log(b);
+        
       canvas.current!.loadFromJSON(b.data, () => {
         // 关键：加载后强制校准偏移 + 重绘
         canvas.current!.calcOffset(); // 校准画布偏移（解决“渲染在视口外”问题）
@@ -107,7 +105,7 @@ export default function ExcalidrawClone() {
           height: canvasRef.current?.clientHeight || 600,
         });
       });
-    });
+  }});
     // 保存画布实例
     fabricCanvasRef.current = canvas.current;
     if (canvas.current) {
@@ -140,7 +138,7 @@ export default function ExcalidrawClone() {
     // 合并为 2 个监听：通用修改 + 特殊操作
     canvas.current.on("path:created", () => {
       const a = canvas.current.toJSON();
-      saveDrawing(a);
+      saveCanvasData(a);
     }); 
     return () => {
       canvas.current?.off("path:created", () => {});
