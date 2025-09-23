@@ -93,8 +93,6 @@ export default function ExcalidrawClone() {
     window.addEventListener("resize", setCanvasDimensions);
     getCanvasDataById('latest').then((b) => {
       if(b){
-        console.log(b);
-        
       canvas.current!.loadFromJSON(b.data, () => {
         // 关键：加载后强制校准偏移 + 重绘
         canvas.current!.calcOffset(); // 校准画布偏移（解决“渲染在视口外”问题）
@@ -106,6 +104,21 @@ export default function ExcalidrawClone() {
         });
       });
   }});
+  window.addEventListener('keydown', (e) => {
+    // 避免在输入框、文本区域中触发删除
+  const activeElement = document.activeElement;
+  const isInput = ['INPUT', 'TEXTAREA'].includes(activeElement.tagName);
+  if (isInput) return;
+
+  // 检查是否按下了 Delete 或 Backspace 键
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    // 阻止默认行为（如浏览器前进/后退）
+    e.preventDefault();
+    // 获取当前选中的对象
+    const activeObject = canvas.current?.getActiveObject();
+    canvas.current?.remove(activeObject);
+    }
+  });
     // 保存画布实例
     fabricCanvasRef.current = canvas.current;
     if (canvas.current) {

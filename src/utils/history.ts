@@ -185,17 +185,10 @@ const handleObjectRemoved = (object: fabric.Object) => {
     type: "delete",
     timestamp: Date.now(),
     data: {
-      object: object.toObject(), // 存储被删除对象数据，用于撤销恢复
+      id: object.target.id,
+      object: object.target.toJSON(), // 存储被删除对象数据，用于撤销恢复
     },
   };
-
-  // 更新历史栈
-  if (historyState.currentIndex < historyState.actions.length - 1) {
-    historyState.actions = historyState.actions.slice(
-      0,
-      historyState.currentIndex + 1
-    );
-  }
   historyState.actions.push(action);
   historyState.currentIndex = historyState.actions.length - 1;
   redoState.actions.length = 0; // 清空重做栈
@@ -248,7 +241,8 @@ const handleObjectRemoved = (object: fabric.Object) => {
 const pauseHistoryListening = () => {
   if (!canvas) return;
   canvas.off("object:added", handleObjectAdded);
-  canvas.off("object:modified", handleObjectModified);
+  canvas.off("before:transform", handleModifing);
+  canvas.off("object:modified", handleModified);
   canvas.off("object:removed", handleObjectRemoved);
   //   canvas.off("object:selected", handleObjectSelected);
 };
@@ -259,7 +253,8 @@ const pauseHistoryListening = () => {
 const resumeHistoryListening = () => {
   if (!canvas) return;
   canvas.on("object:added", handleObjectAdded);
-  canvas.on("object:modified", handleObjectModified);
+  canvas.on("before:transform", handleModifing);
+  canvas.on("object:modified", handleModified);
   canvas.on("object:removed", handleObjectRemoved);
   //   canvas.on("object:selected", handleObjectSelected);
 };
@@ -278,23 +273,35 @@ export const undo = async (): Promise<boolean> => {
       case "add": {
         canvas.getObjects().find((o) => console.log(o.id));
         const obj = canvas.getObjects().find((o) => o.id === action.id);
-        console.log(obj);
-
         if (obj) canvas.remove(obj);
         break;
       }
       case "modify": {
         // 撤销修改：恢复旧属性
+        console.log("action:", action);
         const { objectId, oldProps } = action.data as ModifyActionData;
-        const targetObj = canvas.getObjectById(objectId);
-        if (targetObj) targetObj.set(oldProps).setCoords();
+        const obj = canvas.getObjects().find((o) => o.id === objectId);
+        if (obj) obj.set(oldProps).setCoords();
         break;
       }
       case "delete": {
         // 撤销删除：重新添加对象
-        const { object } = action.data as DeleteActionData;
-        const restoredObj = fabric.util.createObjectFromObject(object);
-        canvas.add(restoredObj);
+        const restoredObj = {
+          id: action.data.id,
+          ...action.data.object,
+          type: action.data.object.type.toLowerCase(),
+        };
+        await fabric.util
+          .enlivenObjects([restoredObj])
+          .then((objects) => {
+            if (objects.length > 0) {
+              canvas.add(objects[0]);
+              canvas.renderAll();
+            }
+          })
+          .catch((err) => {
+            console.error("转换失败：", err); // 捕获错误
+          });
         break;
       }
     }
@@ -302,7 +309,6 @@ export const undo = async (): Promise<boolean> => {
     // 更新历史索引并保存
     historyState.currentIndex -= 1;
     redoState.actions.push(action);
-    // await saveHistoryToDB();
     canvas.renderAll();
     return true;
   } catch (error) {
@@ -328,9 +334,8 @@ export const redo = async (): Promise<boolean> => {
   try {
     switch (action.type) {
       case "add": {
+        console.log("action1:", action);
         const object = action.data.object;
-        console.log(action);
-
         const restoredObj = {
           id: action.id,
           ...object,
@@ -340,10 +345,7 @@ export const redo = async (): Promise<boolean> => {
         await fabric.util
           .enlivenObjects([restoredObj])
           .then((objects) => {
-            console.log("转换成功的对象：", objects); // 现在会触发
             if (objects.length > 0) {
-              console.log("objects[0]:", objects);
-
               canvas.add(objects[0]);
               canvas.renderAll();
             }
@@ -356,14 +358,14 @@ export const redo = async (): Promise<boolean> => {
       case "modify": {
         // 重做修改：恢复新属性
         const { objectId, newProps } = action.data as ModifyActionData;
-        const targetObj = canvas.getObjectById(objectId);
-        if (targetObj) targetObj.set(newProps).setCoords();
+        const obj = canvas.getObjects().find((o) => o.id === objectId);
+        if (obj) obj.set(newProps).setCoords();
         break;
       }
       case "delete": {
         // 重做删除：删除对应的对象
         const { object } = action.data as DeleteActionData;
-        const targetObj = canvas.getObjectById(object.id);
+        const targetObj = canvas.getObjects().find((o) => o.id === action.data.id);
         if (targetObj) canvas.remove(targetObj);
         break;
       }
@@ -414,7 +416,8 @@ export const destroyHistoryManager = async () => {
   if (modifyDebounceTimer) clearTimeout(modifyDebounceTimer);
   if (canvas) {
     canvas.off("object:added", handleObjectAdded);
-    canvas.off("object:modified", handleObjectModified);
+    canvas.off("before:transform", handleModifing);
+    canvas.off("object:modified", handleModified);
     canvas.off("object:removed", handleObjectRemoved);
     // canvas.off("object:selected", handleObjectSelected);
   }
@@ -428,4 +431,36 @@ export const destroyHistoryManager = async () => {
  */
 export const getCurrentHistoryState = (): HistoryState => {
   return { ...historyState }; // 返回拷贝，避免外部修改
+};
+// 修改
+let pendingAction = null;
+const handleModified = (obj: fabric.Object) => {
+  if(!canvas) return;
+  if(pendingAction && pendingAction.data.objectId === obj.target.id){
+    pendingAction.data.newProps = obj.target.toJSON();
+    historyState.actions.push(pendingAction)
+    pendingAction = null;
+    historyState.currentIndex = historyState.actions.length - 1;
+    redoState.actions.length = 0; // 清空重做栈
+  }else {
+    // 异常情况处理（如未捕获到开始事件）
+    console.warn("未找到对应的修改开始记录", obj.target.id);
+    pendingAction = null;
+  }
+};
+const handleModifing = (obj: fabric.Object) => {
+  console.log("handleModifing:", obj.transform.target);
+  console.log("handleModifing:", obj.transform.target.toJSON());
+  if(!canvas) return;
+  const id = generateActionId()
+  pendingAction = {
+    type: "modify",
+    id:id,
+    data: {
+      objectId: obj.transform.target.id,
+      oldProps: obj.transform.target.toJSON(),
+      newProps: null,
+    },
+    timestamp: Date.now()
+  };
 };
