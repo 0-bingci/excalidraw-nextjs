@@ -283,6 +283,124 @@ const diamondToolHandler: ToolHandler = {
   }
 };
 
+// 箭头工具处理器
+const arrowToolHandler: ToolHandler = {
+  onSelect: (canvas) => {
+    canvas.isDrawingMode = false;
+    canvas.selection = false;
+    canvas.defaultCursor = 'crosshair'; // 十字形光标
+  },
+  //开始绘制
+  onStartDrawing: (canvas, x, y, state) => {
+    state.isDrawing = true;
+    state.startX = x;
+    state.startY = y;
+    
+    // 初始化当前形状为null，稍后在onDrawing中创建
+    state.currentShape = null;
+  },
+  //拖动鼠标时触发
+  onDrawing: (canvas, x, y, state) => {
+    //如果当前不是绘制状态，直接返回
+    if (!state.isDrawing) return;
+    
+    // 移除之前创建的临时箭头（如果存在）
+    if (state.currentShape) {
+      canvas.remove(state.currentShape);
+      state.currentShape = null;
+    }
+    
+    // 创建箭头的主体线条
+    const mainLine = new fabric.Line([state.startX, state.startY, x, y], {
+      fill: state.shapeProperties.strokeColor,
+      stroke: state.shapeProperties.strokeColor,
+      strokeWidth: state.shapeProperties.strokeWidth,
+      selectable: false
+    });
+    
+    // 创建一个组来包含主体线条和箭头两边
+    const arrowGroup = new fabric.Group([mainLine], {
+      selectable: true,
+      stroke: state.shapeProperties.strokeColor,
+      strokeWidth: state.shapeProperties.strokeWidth,
+      fill: state.shapeProperties.fillColor || state.shapeProperties.strokeColor
+    });
+    
+    // 计算箭头的角度和尺寸
+    const angle = Math.atan2(y - state.startY, x - state.startX);
+    const headLength = 15; // 箭头头部长度
+    const headAngle = Math.PI / 6; // 箭头两边与主线的夹角
+    
+    // 计算箭头左侧边的终点
+    const leftArrowX = x - headLength * Math.cos(angle - headAngle);
+    const leftArrowY = y - headLength * Math.sin(angle - headAngle);
+    
+    // 计算箭头右侧边的终点
+    const rightArrowX = x - headLength * Math.cos(angle + headAngle);
+    const rightArrowY = y - headLength * Math.sin(angle + headAngle);
+    
+    // 创建箭头的左侧边
+    const leftArrowLine = new fabric.Line([x, y, leftArrowX, leftArrowY], {
+      fill: state.shapeProperties.strokeColor,
+      stroke: state.shapeProperties.strokeColor,
+      strokeWidth: state.shapeProperties.strokeWidth,
+      selectable: false
+    });
+    
+    // 创建箭头的右侧边
+    const rightArrowLine = new fabric.Line([x, y, rightArrowX, rightArrowY], {
+      fill: state.shapeProperties.strokeColor,
+      stroke: state.shapeProperties.strokeColor,
+      strokeWidth: state.shapeProperties.strokeWidth,
+      selectable: false
+    });
+    
+    // 将箭头的两边添加到组中
+    arrowGroup.add(leftArrowLine);
+    arrowGroup.add(rightArrowLine);
+    
+    // 更新当前形状为箭头组
+    state.currentShape = arrowGroup;
+    
+    // 添加到画布
+    canvas.add(state.currentShape);
+    // 渲染画布
+    canvas.renderAll();
+  },
+  // 绘制结束时触发
+  onEndDrawing: (canvas, state) => {
+    if (!state.isDrawing) return;
+    //绘制状态结束
+    state.isDrawing = false;
+    
+    // 确保箭头至少有一定长度
+    if (state.currentShape) {
+      const group = state.currentShape as fabric.Group;
+      // 获取线条元素
+      const line = group.getObjects()[0] as fabric.Line;
+      if (line) {
+        // 计算线条长度
+        const length = Math.sqrt(
+          Math.pow(line.x2! - line.x1!, 2) + 
+          Math.pow(line.y2! - line.y1!, 2)
+        );
+        
+        if (length < 5) {
+          canvas.remove(state.currentShape);
+        }
+      }
+    }
+    
+    //清空当前绘图对象
+    state.currentShape = null;
+    //重新渲染画布
+    canvas.renderAll();
+  },
+  onDeselect: (canvas) => {
+    // 清理逻辑
+  }
+};
+
 // 工具处理器映射
 export const toolHandlers: Record<Tool, ToolHandler> = {
   select: selectToolHandler,
@@ -290,7 +408,7 @@ export const toolHandlers: Record<Tool, ToolHandler> = {
   rectangle: rectangleToolHandler,
   diamond: diamondToolHandler, // 使用菱形工具的逻辑
   circle: circleToolHandler, // 使用圆形工具的逻辑
-  arrow: selectToolHandler, // 暂时使用选择工具的逻辑
+  arrow: arrowToolHandler, // 使用箭头工具的逻辑
   line: selectToolHandler, // 暂时使用选择工具的逻辑
   pen: penToolHandler,
   text: selectToolHandler, // 暂时使用选择工具的逻辑
