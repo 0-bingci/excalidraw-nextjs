@@ -12,7 +12,9 @@ export const createToolState = (): CanvasToolState => ({
     strokeColor: '#000000',
     fillColor: 'transparent',
     strokeWidth: 2 // 减小笔画宽度从4到2
-  }
+  },
+  textToolWaitingForExit: false,
+  erasedObjects: []
 });
 
 // 选择工具处理器
@@ -88,7 +90,7 @@ const rectangleToolHandler: ToolHandler = {
     //如果当前不是绘制状态或者没有当前图形对象，直接返回
     if (!state.isDrawing || !state.currentShape) return;
     
-    const width = Math.abs(x - state.startX);
+    const width = globalThis.Math.abs(x - state.startX);
     const height = Math.abs(y - state.startY);
     const left = Math.min(x, state.startX);
     const top = Math.min(y, state.startY);
@@ -401,19 +403,499 @@ const arrowToolHandler: ToolHandler = {
   }
 };
 
+// 线段工具处理器
+const lineToolHandler: ToolHandler = {
+  onSelect: (canvas) => {
+    canvas.isDrawingMode = false;
+    canvas.selection = false;
+    canvas.defaultCursor = 'crosshair'; // 十字形光标
+  },
+  //开始绘制
+  onStartDrawing: (canvas, x, y, state) => {
+    state.isDrawing = true;
+    state.startX = x;
+    state.startY = y;
+    
+    // 初始化当前形状为null，稍后在onDrawing中创建
+    state.currentShape = null;
+  },
+  //拖动鼠标时触发
+  onDrawing: (canvas, x, y, state) => {
+    //如果当前不是绘制状态，直接返回
+    if (!state.isDrawing) return;
+    
+    // 移除之前创建的临时线段（如果存在）
+    if (state.currentShape) {
+      canvas.remove(state.currentShape);
+      state.currentShape = null;
+    }
+    
+    // 创建新的线段
+    state.currentShape = new fabric.Line([state.startX, state.startY, x, y], {
+      fill: state.shapeProperties.strokeColor,
+      stroke: state.shapeProperties.strokeColor,
+      strokeWidth: state.shapeProperties.strokeWidth,
+      selectable: true,
+      objectCaching: false
+    });
+    
+    // 添加到画布
+    canvas.add(state.currentShape);
+    // 渲染画布
+    canvas.renderAll();
+  },
+  // 绘制结束时触发
+  onEndDrawing: (canvas, state) => {
+    if (!state.isDrawing || !state.currentShape) return;
+    //绘制状态结束
+    state.isDrawing = false;
+    
+    // 确保线段至少有一定长度
+    const line = state.currentShape as fabric.Line;
+    const length = Math.sqrt(
+      Math.pow(line.x2! - line.x1!, 2) + 
+      Math.pow(line.y2! - line.y1!, 2)
+    );
+    
+    if (length < 5) {
+      canvas.remove(state.currentShape);
+    }
+    
+    //清空当前绘图对象
+    state.currentShape = null;
+    //重新渲染画布
+    canvas.renderAll();
+  },
+  onDeselect: (canvas) => {
+    // 清理逻辑
+  }
+};
+
+// 橡皮擦工具处理器
+const eraserToolHandler: ToolHandler = {
+  onSelect: (canvas) => {
+    canvas.isDrawingMode = false;
+    canvas.selection = false;
+    canvas.defaultCursor = 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ccircle cx=%2210%22 cy=%2210%22 r=%228%22 fill=%22white%22 stroke=%22black%22 stroke-width=%221%22 /%3E%3C/svg%3E") 10 10, auto'; // 橡皮擦光标
+  },
+  onStartDrawing: (canvas, x, y, state) => {
+    state.isDrawing = true;
+    
+    // 检查点击位置是否有对象
+    const objects = canvas.getObjects();
+    for (let i = objects.length - 1; i >= 0; i--) {
+      const obj = objects[i];
+      
+      // 对于透明填充的对象，需要特殊处理
+      if (obj.containsPoint(new fabric.Point(x, y)) || 
+          // 矩形检测
+          (obj.type === 'rect' && 
+           x >= obj.left && x <= obj.left + obj.width && 
+           y >= obj.top && y <= obj.top + obj.height) ||
+          // 圆形检测 - 使用圆的几何公式：(x-centerX)^2 + (y-centerY)^2 <= radius^2
+          (obj.type === 'circle' && 
+           ((x - (obj.left + obj.radius)) * (x - (obj.left + obj.radius)) + 
+            (y - (obj.top + obj.radius)) * (y - (obj.top + obj.radius)) <= 
+            obj.radius * obj.radius))) {
+        // 检查对象是否已经被擦除中（避免重复添加）
+        const isAlreadyErased = state.erasedObjects.some(item => item.object === obj);
+        if (!isAlreadyErased) {
+          // 保存原始透明度
+          const originalOpacity = obj.opacity || 1;
+          
+          // 添加到被擦除对象列表
+          state.erasedObjects.push({
+            object: obj,
+            originalOpacity
+          });
+          
+          // 降低透明度（虚化效果）
+          obj.set({ opacity: 0.3 });
+          
+          canvas.renderAll();
+          break;
+        }
+      }
+    }
+  },
+  onDrawing: (canvas, x, y, state) => {
+    if (!state.isDrawing) return;
+    
+    // 检查当前鼠标位置是否有对象
+    const objects = canvas.getObjects();
+    for (let i = objects.length - 1; i >= 0; i--) {
+      const obj = objects[i];
+      
+      // 对于透明填充的对象，需要特殊处理
+      if (obj.containsPoint(new fabric.Point(x, y)) || 
+          // 矩形检测
+          (obj.type === 'rect' && 
+           x >= obj.left && x <= obj.left + obj.width && 
+           y >= obj.top && y <= obj.top + obj.height) ||
+          // 圆形检测 - 使用圆的几何公式：(x-centerX)^2 + (y-centerY)^2 <= radius^2
+          (obj.type === 'circle' && 
+           ((x - (obj.left + obj.radius)) * (x - (obj.left + obj.radius)) + 
+            (y - (obj.top + obj.radius)) * (y - (obj.top + obj.radius)) <= 
+            obj.radius * obj.radius))) {
+        // 检查对象是否已经被擦除中（避免重复添加）
+        const isAlreadyErased = state.erasedObjects.some(item => item.object === obj);
+        if (!isAlreadyErased) {
+          // 保存原始透明度
+          const originalOpacity = obj.opacity || 1;
+          
+          // 添加到被擦除对象列表
+          state.erasedObjects.push({
+            object: obj,
+            originalOpacity
+          });
+          
+          // 降低透明度（虚化效果）
+          obj.set({ opacity: 0.3 });
+          
+          canvas.renderAll();
+          break;
+        }
+      }
+    }
+  },
+  onEndDrawing: (canvas, state) => {
+    state.isDrawing = false;
+    
+    // 删除所有被擦除的对象
+    if (state.erasedObjects.length > 0) {
+      state.erasedObjects.forEach(item => {
+        canvas.remove(item.object);
+      });
+      
+      // 清空被擦除对象列表
+      state.erasedObjects = [];
+      
+      canvas.renderAll();
+    }
+  },
+  onDeselect: (canvas) => {
+    canvas.defaultCursor = 'default';
+  }
+};
+
+// 文本工具处理器
+const textToolHandler: ToolHandler = {
+  onSelect: (canvas) => {
+    canvas.isDrawingMode = false;
+    canvas.selection = false;
+    canvas.defaultCursor = 'text'; // 文本输入光标
+    // 重置编辑标志
+    (canvas as any).isEditingText = false;
+  },
+  onStartDrawing: (canvas, x, y, state) => {
+    state.isDrawing = true;
+    
+    // 创建空白文本输入框
+    const textObj = new fabric.IText('', {
+      left: x,
+      top: y,
+      fontFamily: 'Arial',
+      fontSize: 20,
+      fill: state.shapeProperties.strokeColor,
+      selectable: true,
+      hasControls: true,
+      hasBorders: true
+    });
+    
+    canvas.add(textObj);
+    canvas.setActiveObject(textObj);
+    
+    // 自动进入编辑模式
+    textObj.enterEditing();
+    
+    // 标记为正在编辑文本
+    (canvas as any).isEditingText = true;
+    
+    // 监听文本编辑完成事件
+    const finishEditing = () => {
+      (canvas as any).isEditingText = false;
+      canvas.off('text:editing:exited', finishEditing);
+    };
+    canvas.on('text:editing:exited', finishEditing);
+    
+    // 设置当前形状
+    state.currentShape = textObj;
+    
+    // 重新渲染画布
+    canvas.renderAll();
+  },
+  onDrawing: () => {
+    // 文本工具在绘制过程中不需要特殊处理
+  },
+  onEndDrawing: (canvas, state) => {
+    state.isDrawing = false;
+    
+    // 不要在onEndDrawing中立即移除空文本框，因为用户刚创建文本框时还没有机会输入文字
+    // 保持文本框在画布上，让用户可以继续编辑
+    state.currentShape = null;
+    canvas.renderAll();
+  },
+  onDeselect: (canvas) => {
+    canvas.defaultCursor = 'default';
+    // 取消编辑标志
+    (canvas as any).isEditingText = false;
+  }
+};
+
+// 抓手工具处理器
+const handToolHandler: ToolHandler = {
+  onSelect: (canvas) => {
+    canvas.isDrawingMode = false;
+    canvas.selection = false;
+    canvas.defaultCursor = 'grab'; // 抓手光标
+    
+    // 确保没有选中任何对象
+    canvas.discardActiveObject();
+    
+    // 存储原始画布状态
+    (canvas as any)._handTool = {
+      isPanning: false,
+      lastPosX: 0,
+      lastPosY: 0,
+      // 保存原始的selection和selectionKey属性
+      originalSelection: canvas.selection,
+      originalSelectionKey: canvas.selectionKey
+    };
+    
+    // 临时覆盖selectionKey，防止选择对象
+    canvas.selectionKey = 'none';
+    
+    // 优化渲染性能
+    canvas.skipTargetFind = true;
+  },
+  onStartDrawing: (canvas, x, y, state) => {
+    state.isDrawing = true;
+    const handToolState = (canvas as any)._handTool;
+    
+    if (handToolState) {
+      handToolState.isPanning = true;
+      handToolState.lastPosX = x;
+      handToolState.lastPosY = y;
+      canvas.defaultCursor = 'grabbing'; // 拖动中光标
+      
+      // 再次确保没有选中任何对象
+      canvas.discardActiveObject();
+    }
+  },
+  onDrawing: (canvas, x, y, state) => {
+    if (!state.isDrawing) return;
+    
+    const handToolState = (canvas as any)._handTool;
+    if (handToolState && handToolState.isPanning) {
+      // 计算移动距离
+      const deltaX = x - handToolState.lastPosX;
+      const deltaY = y - handToolState.lastPosY;
+      
+      // 更新画布视口位置
+      canvas.relativePan(new fabric.Point(deltaX, deltaY));
+      
+      // 更新最后位置
+      handToolState.lastPosX = x;
+      handToolState.lastPosY = y;
+      
+      // 使用requestRenderAll替代renderAll以优化性能，减少残影
+      canvas.requestRenderAll();
+    }
+  },
+  onEndDrawing: (canvas, state) => {
+    state.isDrawing = false;
+    const handToolState = (canvas as any)._handTool;
+    
+    if (handToolState) {
+      handToolState.isPanning = false;
+      canvas.defaultCursor = 'grab'; // 恢复抓手光标
+    }
+  },
+  onDeselect: (canvas) => {
+    const handToolState = (canvas as any)._handTool;
+    
+    if (handToolState) {
+      // 恢复原始设置
+      canvas.selection = handToolState.originalSelection;
+      canvas.selectionKey = handToolState.originalSelectionKey;
+      canvas.skipTargetFind = false;
+    }
+    
+    canvas.defaultCursor = 'default';
+    canvas.selection = true;
+    
+    // 清理状态
+    delete (canvas as any)._handTool;
+  }
+};
+
+// 图片工具处理器
+const imageToolHandler: ToolHandler = {
+  onSelect: (canvas) => {
+    canvas.isDrawingMode = false;
+    canvas.selection = false;
+    canvas.defaultCursor = 'crosshair';
+  },
+  
+  onStartDrawing: (canvas, x, y, state) => {
+    // 创建或获取文件输入框
+    let fileInput = document.getElementById('image-upload-input') as HTMLInputElement;
+    if (!fileInput) {
+      fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.id = 'image-upload-input';
+      fileInput.accept = 'image/*';
+      fileInput.style.display = 'none';
+      document.body.appendChild(fileInput);
+    }
+    
+    // 处理文件选择
+    const handleFileSelect = (event: Event) => {
+      const target = event.target as HTMLInputElement;
+      const file = target.files?.[0];
+      
+      if (!file) return;
+      
+      const reader = new FileReader();
+      
+      // 处理图片尺寸和添加到画布
+        const processImage = (dataUrl: string) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          
+          img.onload = function() {
+            // 处理图片缩放
+            const maxSize = 400;
+            const minSize = 10;
+            const scale = Math.max(
+              minSize / Math.min(img.width, img.height),
+              Math.min(maxSize / Math.max(img.width, img.height), 1)
+            );
+            
+            // 创建并添加图片对象到画布
+            const fabricImg = new fabric.Image(img);
+            fabricImg.set({
+              left: x,
+              top: y,
+              borderColor: 'blue',
+              cornerColor: 'red',
+              selectable: true,
+              scaleX: scale,
+              scaleY: scale
+            });
+            
+            canvas.add(fabricImg);
+            canvas.renderAll();
+            
+            // 设置当前形状，为后续的onEndDrawing做准备
+            state.currentShape = fabricImg;
+            
+            // 立即结束绘制过程，触发onEndDrawing
+            setTimeout(() => {
+              if (toolHandlers['image'] && toolHandlers['image'].onEndDrawing) {
+                toolHandlers['image'].onEndDrawing(canvas, state);
+              }
+            }, 0);
+          };
+          
+          img.src = dataUrl;
+        };
+      
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        processImage(dataUrl);
+      };
+      
+      reader.readAsDataURL(file);
+      
+      // 清理事件监听器
+      fileInput.removeEventListener('change', handleFileSelect);
+    };
+    
+    fileInput.addEventListener('change', handleFileSelect);
+    fileInput.click();
+    
+    state.isDrawing = true;
+  },
+  
+  onDrawing: () => {},
+  
+  onEndDrawing: (canvas, state) => {
+    // 重置绘制状态
+    state.isDrawing = false;
+    state.currentShape = null;
+    
+    // 1. 直接调用setActiveTool函数来切换工具
+    setActiveTool(canvas, 'select', 'image', state);
+    
+    // 2. 确保状态正确更新
+    state.activeTool = 'select';
+    
+    // 3. 强制重新渲染画布
+    canvas.renderAll();
+    
+    // 4. 立即清理文件输入框
+    setTimeout(() => {
+      const fileInput = document.getElementById('image-upload-input');
+      if (fileInput) {
+        document.body.removeChild(fileInput);
+      }
+    }, 0);
+    
+    // 5. 创建并触发一个自定义事件，通知所有监听者工具状态已更改
+    // 这是最关键的一步，可以触发React组件重新渲染
+    setTimeout(() => {
+      try {
+        // 尝试创建一个可以触发React更新的事件
+        const customEvent = new CustomEvent('toolStateChanged', {
+          bubbles: true,
+          detail: { activeTool: 'select' }
+        });
+        
+        // 同时在多个地方触发事件，增加成功几率
+        canvas.upperCanvasEl.dispatchEvent(customEvent);
+        document.dispatchEvent(customEvent);
+        
+        // 强制触发窗口重绘
+        window.requestAnimationFrame(() => {
+          canvas.renderAll();
+          // 通过改变样式来强制重绘
+          const style = canvas.upperCanvasEl.style.visibility;
+          canvas.upperCanvasEl.style.visibility = 'hidden';
+          canvas.upperCanvasEl.offsetHeight; // 触发重排
+          canvas.upperCanvasEl.style.visibility = style;
+        });
+      } catch (e) {
+        console.log('Event dispatch failed:', e);
+      }
+    }, 10);
+  },
+  
+  onDeselect: (canvas) => {
+    canvas.defaultCursor = 'default';
+    canvas.selection = true;
+    
+    // 延迟清理文件输入框
+    setTimeout(() => {
+      const fileInput = document.getElementById('image-upload-input');
+      if (fileInput) document.body.removeChild(fileInput);
+    }, 1000);
+  }
+};
+
 // 工具处理器映射
 export const toolHandlers: Record<Tool, ToolHandler> = {
   select: selectToolHandler,
-  hand: selectToolHandler, // 暂时使用选择工具的逻辑
+  hand: handToolHandler, // 使用抓手工具的逻辑
   rectangle: rectangleToolHandler,
   diamond: diamondToolHandler, // 使用菱形工具的逻辑
   circle: circleToolHandler, // 使用圆形工具的逻辑
   arrow: arrowToolHandler, // 使用箭头工具的逻辑
-  line: selectToolHandler, // 暂时使用选择工具的逻辑
+  line: lineToolHandler, // 使用线段工具的逻辑
   pen: penToolHandler,
-  text: selectToolHandler, // 暂时使用选择工具的逻辑
-  image: selectToolHandler, // 暂时使用选择工具的逻辑
-  eraser: selectToolHandler // 暂时使用选择工具的逻辑
+  text: textToolHandler, // 使用文本工具的逻辑
+  image: imageToolHandler, // 使用图片工具的逻辑
+  eraser: eraserToolHandler // 使用橡皮擦工具的逻辑
 };
 
 // 设置活动工具
@@ -472,5 +954,12 @@ export const handleMouseUp = (
   const handler = toolHandlers[toolState.activeTool];
   if (handler && handler.onEndDrawing) {
     handler.onEndDrawing(canvas, toolState);
+  }
+  
+  // 对于绘制工具（矩形、菱形、圆形、箭头、线段），在完成绘制后自动切换回选择模式
+  // 注意：文本工具和图片工具不包含在内，图片工具在onEndDrawing方法中有特殊处理
+  const drawingTools: Tool[] = ['rectangle', 'diamond', 'circle', 'arrow', 'line'];
+  if (drawingTools.includes(toolState.activeTool)) {
+    setActiveTool(canvas, 'select', toolState.activeTool, toolState);
   }
 };

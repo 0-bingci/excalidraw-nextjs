@@ -82,7 +82,9 @@ export default function ExcalidrawClone() {
     window.addEventListener('resize', setCanvasDimensions);
     
     // 初始化画布工具
-    canvasToolsRef.current = initializeCanvasTools(canvas.current);
+    canvasToolsRef.current = initializeCanvasTools(canvas.current, (tool: Tool) => {
+      setSelectedTool(tool);
+    });
     canvasToolsRef.current.setupEventListeners();
 
     // 清理函数

@@ -21,6 +21,12 @@ export interface ShapeProperties {
   strokeWidth: number;
 }
 
+// 橡皮擦中对象的信息接口
+interface ErasedObjectInfo {
+  object: fabric.Object;
+  originalOpacity: number;
+}
+
 // 画布工具状态接口
 export interface CanvasToolState {
   activeTool: Tool;
@@ -31,6 +37,10 @@ export interface CanvasToolState {
   currentShape: fabric.Object | null;
   //图形样式
   shapeProperties: ShapeProperties;
+  //文本工具状态：true表示已创建文本框，准备点击空白处返回选择模式
+  textToolWaitingForExit: boolean;
+  //存储被橡皮擦中对象的信息，用于实现按住时虚化，松开时删除的效果
+  erasedObjects: ErasedObjectInfo[];
 }
 
 // 工具处理器接口
