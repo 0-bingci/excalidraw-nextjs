@@ -2,11 +2,11 @@
 "use client";
 
 import { useState } from "react";
-import NotionSidebar from "@/component/home/Sidebar";
+import NotionSidebar from "@/components/home/Sidebar";
 // 导入页面组件
-import HomePage from "@/component/page/home";
-import InboxPage from "@/component/page/Inbox";
-import Board from "@/component/page/board";
+import HomePage from "@/components/page/home";
+import InboxPage from "@/components/page/Inbox";
+import Board from "@/components/page/board";
 
 export default function NotionWorkspace() {
   // 侧边栏折叠状态

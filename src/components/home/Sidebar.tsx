@@ -79,12 +79,6 @@ export default function NotionSidebar({
           icon: <Home size={16} />,
           label: "综合",
         },
-        // {
-        //   key: "new-team",
-        //   icon: <Plus size={16} />,
-        //   label: "添加新",
-        //   className: "text-gray-500",
-        // },
       ],
     },
   ];

@@ -3,8 +3,8 @@
 import type React from "react";
 import * as fabric from "fabric";
 import { useState, useRef, useEffect } from "react";
-import { initializeCanvasTools } from '@/component/canvas-tools';
-import { Tool } from '@/component/canvas-tools/types';
+import { initializeCanvasTools } from '@/components/canvas-tools';
+import { Tool } from '@/components/canvas-tools/types';
 import {
   MousePointer2,
   Hand,
