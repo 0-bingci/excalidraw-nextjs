@@ -44,6 +44,31 @@ export default function ExcalidrawClone() {
   const [isLocked, setIsLocked] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [showLibrary, setShowLibrary] = useState(false);
+  // 右键菜单状态
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+  });
+  
+  // AI对话框状态
+  const [aiDialog, setAiDialog] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    input: string;
+    messages: Array<{type: 'user' | 'ai', content: string}>;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    input: '',
+    messages: [],
+  });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvas = useRef<fabric.Canvas | null>(null);
@@ -258,13 +283,150 @@ export default function ExcalidrawClone() {
       </div>
 
       {/* 画布区域 */}
-      <div className="relative w-1000 h-full" id="canvasContainer" ref={containerRef}>
+      <div 
+        className="relative w-1000 h-full" 
+        id="canvasContainer" 
+        ref={containerRef}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setContextMenu({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY
+          });
+        }}
+        onClick={() => {
+          if (contextMenu.visible) {
+            setContextMenu({...contextMenu, visible: false});
+          }
+        }}
+      >
         {/* 画布 */}
         <canvas
           id="stageCanvas"
           ref={canvasRef}
           className="absolute inset-0 cursor-crosshair"
         />
+        
+        {/* 右键菜单 */}
+        {contextMenu.visible && (
+          <div 
+            className="absolute bg-white rounded-lg shadow-xl border border-gray-200 p-2 z-50"
+            style={{
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`,
+            }}
+          >
+            <button 
+              className="w-full px-4 py-2 flex items-center justify-center gap-2 rounded-md bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-lg transition-all duration-200"
+              onClick={() => {
+                setContextMenu({...contextMenu, visible: false});
+                setAiDialog({
+                  ...aiDialog,
+                  visible: true,
+                  x: contextMenu.x,
+                  y: contextMenu.y
+                });
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3Z" stroke="currentColor" strokeWidth="2" />
+                <path d="M8 12H16M12 8V16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              <span>AI 助手</span>
+            </button>
+          </div>
+        )}
+        
+        {/* AI对话框 */}
+        {aiDialog.visible && (
+          <div 
+            className="absolute bg-white rounded-lg shadow-2xl border border-gray-200 z-50 w-80"
+            style={{
+              left: `${aiDialog.x}px`,
+              top: `${aiDialog.y}px`,
+              maxHeight: '400px',
+            }}
+          >
+            <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg">
+              <h3 className="font-medium">AI 助手</h3>
+              <button 
+                className="text-white hover:bg-white/20 rounded-full p-1"
+                onClick={() => setAiDialog({...aiDialog, visible: false})}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="p-3 overflow-y-auto max-h-[280px] flex flex-col gap-2">
+              {aiDialog.messages.length === 0 ? (
+                <div className="text-gray-500 text-center py-4">
+                  <p>我是您的AI助手，请问有什么可以帮您？</p>
+                </div>
+              ) : (
+                aiDialog.messages.map((msg, index) => (
+                  <div 
+                    key={index} 
+                    className={`p-2 rounded-lg max-w-[90%] ${
+                      msg.type === 'user' 
+                        ? 'bg-blue-100 text-blue-800 self-end' 
+                        : 'bg-gray-100 text-gray-800 self-start'
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div className="p-3 border-t border-gray-200">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="输入您的问题..."
+                  value={aiDialog.input}
+                  onChange={(e) => setAiDialog({...aiDialog, input: e.target.value})}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && aiDialog.input.trim()) {
+                      const newMessages = [
+                        ...aiDialog.messages,
+                        { type: 'user', content: aiDialog.input.trim() },
+                        { type: 'ai', content: '我理解您的问题，正在思考如何帮助您...' }
+                      ];
+                      setAiDialog({
+                        ...aiDialog,
+                        messages: newMessages,
+                        input: ''
+                      });
+                    }
+                  }}
+                />
+                <button 
+                  className="bg-blue-500 text-white rounded-lg px-3 py-2 hover:bg-blue-600"
+                  onClick={() => {
+                    if (aiDialog.input.trim()) {
+                      const newMessages = [
+                        ...aiDialog.messages,
+                        { type: 'user', content: aiDialog.input.trim() },
+                        { type: 'ai', content: '我理解您的问题，正在思考如何帮助您...' }
+                      ];
+                      setAiDialog({
+                        ...aiDialog,
+                        messages: newMessages,
+                        input: ''
+                      });
+                    }
+                  }}
+                >
+                  发送
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
