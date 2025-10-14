@@ -4,6 +4,7 @@ module.exports = {
   content: [
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}", // 扫描 src/app 下的所有文件
     "./src/components/**/*.{js,ts,jsx,tsx}", // 若有 components 目录也需包含
+    "./src/page/*.{js,ts,jsx,tsx}", // 扫描 src/app/board 下的所有文件
   ],
   theme: {
     extend: {

@@ -8,6 +8,9 @@ export default function NotionMainContent() {
   return (
     <main className="flex-1 overflow-y-auto">
       <div className="max-w-5xl mx-auto px-20 py-16">
+        <div className="flex items-center justify-between mb-12">
+          <h1 className="text-4xl font-bold text-gray-900">白板</h1>
+        </div>
 
         {/* 最近访问区域 */}
         <section className="mb-12">
@@ -45,7 +48,7 @@ export default function NotionMainContent() {
         <section className="mb-12">
           <div className="flex items-center gap-2 mb-4 text-gray-500">
             <BookOpen size={16} />
-            <h2 className="text-sm font-medium">入门学习</h2>
+            <h2 className="text-sm font-medium">产品文档</h2>
           </div>
           <div className="grid grid-cols-4 gap-4">
             {/* 教程卡片1 */}

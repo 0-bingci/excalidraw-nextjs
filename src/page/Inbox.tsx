@@ -8,11 +8,15 @@ import {
   MoreHorizontal,
   Clock,
   CheckCircle2,
+  CheckSquare,
+  Square,
+  Calendar,
+  Flag
 } from "lucide-react";
-import { Input } from "antd"; // 仅保留Input，卡片/按钮用原生样式实现统一
+import { Input } from "antd";
 
 export default function InboxPage() {
-  // 模拟收件箱数据（未读+已读消息）
+  // 模拟收件箱数据
   const messages = [
     {
       id: 1,
@@ -38,154 +42,213 @@ export default function InboxPage() {
     {
       id: 4,
       title: "系统维护通知",
-      content:
-        "本周五 23:00-次日1:00 系统将进行维护，期间可能无法访问，请提前安排工作",
+      content: "本周五 23:00-次日1:00 系统将进行维护，期间可能无法访问，请提前安排工作",
       time: "3天前",
       unread: false,
     },
   ];
 
+  // 新增待办事项数据
+  const todos = [
+    {
+      id: 1,
+      title: "完成项目需求文档",
+      deadline: "今天 18:00",
+      priority: "高",
+      completed: false,
+    },
+    {
+      id: 2,
+      title: "与设计组评审UI方案",
+      deadline: "明天 14:00",
+      priority: "中",
+      completed: false,
+    },
+    {
+      id: 3,
+      title: "修复首页滚动异常问题",
+      deadline: "昨天",
+      priority: "高",
+      completed: true,
+    },
+    {
+      id: 4,
+      title: "整理上周测试反馈",
+      deadline: "周五 12:00",
+      priority: "低",
+      completed: false,
+    },
+  ];
+
   return (
     <main className="flex-1 overflow-y-auto">
-      {/* 2. 外层容器：与 NotionMainContent 完全一致（max-w-5xl、px-20 py-16） */}
-      <div className="max-w-5xl mx-auto px-20 py-16">
-        {/* 3. 头部问候语：复用原样式的 flex 布局、标题大小、更多按钮 */}
+      {/* 头部问候语 */}
+      {/* <div className="max-w-5xl mx-auto px-20 py-16">
         <div className="flex items-center justify-between mb-12">
-          <div className="flex items-center gap-2 mb-4 text-gray-500">
-            <Inbox size={16} />
-            <h2 className="text-lg font-medium">收件箱</h2>
-          </div>
-          <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <MoreHorizontal size={20} className="text-gray-500" />
-          </button>
+          <h1 className="text-4xl font-bold text-gray-900">消息与任务</h1>
         </div>
+      </div> */}
 
-        {/* 4. 收件箱主区域：section 分区+图标标题（与原样式的「最近访问」「入门学习」结构一致） */}
-        <section className="mb-12">
-          {/* 4.2 操作栏：搜索框+新建按钮（保持与原样式卡片一致的视觉风格） */}
-          <div className="flex flex-row items-center gap-4 mb-12">
-            {/* 搜索框：保持原有样式，flex-1 占满剩余宽度，确保不被挤压 */}
+      <div className="max-w-5xl mx-auto px-20 py-16">
+        <div className="flex items-center justify-between mb-12">
+          <h1 className="text-4xl font-bold text-gray-900">消息与任务</h1>
+        </div>
+        {/* 1. 新增现代风格收件箱模块 */}
+        <section className="mb-10">
+          {/* 收件箱标题 - 改为text-sm */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2 text-gray-500">
+              <Inbox size={16} />
+              <h2 className="text-sm font-medium">收件箱</h2> {/* 改为text-sm */}
+            </div>
+            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <MoreHorizontal size={18} className="text-gray-500" />
+            </button>
+          </div>
+
+          {/* 现代风格收件箱操作栏 */}
+          <div className="flex flex-row items-center gap-3 mb-5"> {/* 减小底部间距 */}
             <Input
               placeholder="搜索消息..."
               prefix={<Search size={16} className="text-gray-400" />}
               variant="filled"
-              className="bg-white/50 border-none hover:bg-white/80 focus:bg-white flex-1 min-w-[180px]" // min-w 避免小屏过度压缩
-              style={{ backgroundColor: "rgba(255, 255, 255, 0.5)" }}
-              size="middle" // 显式指定Input尺寸，与按钮高度对齐
+              className="bg-white border border-gray-200 hover:border-gray-300 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 flex-1 min-w-[180px] rounded-md"
+              size="middle"
             />
 
-            {/* 新建消息按钮：固定高度/宽度，与搜索框垂直居中对齐 */}
             <button
-              className="px-4 py-3 bg-gray-50 border border-gray-200 border-dashed rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center gap-2 text-gray-500 whitespace-nowrap" // whitespace-nowrap 防止文字换行
-              style={{ height: "40px" }} // 与Antd Input（middle尺寸）高度完全一致（40px）
+              className="px-4 py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors flex items-center gap-2 text-sm font-medium"
+              style={{ height: "40px" }}
             >
               <Plus size={16} />
-              <span className="text-sm">新建消息</span>
+              <span>新建消息</span>
             </button>
           </div>
 
-          {/* 4.3 消息列表：网格布局（2列，与原样式「活动统计」一致）+ 统一卡片样式 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 现代风格消息列表 - 减小与标题距离 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3"> {/* 减小卡片间距 */}
             {messages.map((msg) => (
-              // 消息卡片：完全仿照原样式「教程卡片」「最近访问卡片」的风格
               <div
                 key={msg.id}
-                className={`bg-gray-50 rounded-lg border ${
-                  msg.unread ? "border-blue-200" : "border-gray-200"
-                } p-6 hover:shadow-sm transition-shadow cursor-pointer group`}
+                className={`rounded-lg p-5 cursor-pointer transition-all duration-200 ${
+                  msg.unread 
+                    ? "bg-white border border-blue-100 shadow-sm hover:shadow" 
+                    : "bg-white border border-gray-100 hover:border-gray-200 hover:shadow-sm"
+                }`}
               >
-                {/* 卡片头部：未读标识+标题+时间 */}
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
                     {msg.unread && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></div>
+                      <div className="w-2.5 h-2.5 bg-blue-500 rounded-full mt-1.5"></div>
                     )}
-                    <h3
-                      className={`text-sm font-medium ${
-                        msg.unread ? "text-gray-900" : "text-gray-700"
-                      }`}
-                    >
+                    <h3 className={`text-sm font-medium ${msg.unread ? "text-gray-900" : "text-gray-700"}`}>
                       {msg.title}
                     </h3>
                   </div>
                   <span className="text-xs text-gray-400">{msg.time}</span>
                 </div>
 
-                {/* 卡片内容：消息正文 */}
                 <p className="text-sm text-gray-500 mb-3 line-clamp-2">
                   {msg.content}
                 </p>
 
-                {/* 卡片底部：操作标识（仿照原样式「教程卡片」底部） */}
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-400">
-                    <Clock size={12} className="inline-block mr-1" />
+                  <span className="text-gray-400 flex items-center">
+                    <Clock size={12} className="mr-1" />
                     标记为已读
                   </span>
                   <CheckCircle2
                     size={14}
-                    className="text-gray-400 group-hover:text-blue-500 transition-colors"
+                    className={`transition-colors ${
+                      msg.unread ? "text-gray-300" : "text-gray-400 hover:text-blue-500"
+                    }`}
                   />
                 </div>
               </div>
             ))}
-
-            {/* 空状态：仿照原样式，不用 Antd Empty */}
-            {messages.length === 0 && (
-              <div className="col-span-full p-12 bg-gray-50 rounded-lg border border-gray-200 text-center">
-                <Inbox size={24} className="mx-auto text-gray-300 mb-3" />
-                <p className="text-sm text-gray-500">暂无消息</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  点击「新建消息」开始发送
-                </p>
-              </div>
-            )}
           </div>
         </section>
 
-        {/* 5. 未读统计区域：新增分区，保持与原样式结构一致 */}
-        {/* <section> */}
-          {/* <div className="flex items-center gap-2 mb-4 text-gray-500">
-            <CheckCircle2 size={16} />
-            <h2 className="text-sm font-medium">消息统计</h2>
-          </div> */}
-
-          {/* <div className="grid grid-cols-2 gap-4"> */}
-            {/* 未读消息统计卡片 */}
-            {/* <div className="p-6 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-center h-24 mb-4">
-                <div className="text-center">
-                  <span className="text-3xl font-bold text-blue-500">
-                    {messages.filter((m) => m.unread).length}
-                  </span>
-                  <p className="text-sm text-gray-500 mt-1">未读消息</p>
-                </div>
-              </div>
-              <div className="text-center">
-                <button className="text-xs text-blue-500 hover:text-blue-600">
-                  标记全部已读
-                </button>
-              </div>
-            </div> */}
-
-            {/* 总消息统计卡片 */}
-            {/* <div className="p-6 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-center h-24 mb-4">
-                <div className="text-center">
-                  <span className="text-3xl font-bold text-gray-700">
-                    {messages.length}
-                  </span>
-                  <p className="text-sm text-gray-500 mt-1">总消息数</p>
-                </div>
-              </div>
-              <div className="text-center">
-                <button className="text-xs text-gray-500 hover:text-gray-700">
-                  清理历史消息
-                </button>
-              </div>
+        {/* 2. 原收件箱模块改为待办事项模块 */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2 text-gray-500">
+              <CheckSquare size={16} />
+              <h2 className="text-sm font-medium">待办事项</h2>
             </div>
-          </div> */}
-        {/* </section> */}
+            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <MoreHorizontal size={18} className="text-gray-500" />
+            </button>
+          </div>
+
+          {/* 待办事项操作栏 */}
+          <div className="flex flex-row items-center gap-3 mb-5">
+            <Input
+              placeholder="搜索任务..."
+              prefix={<Search size={16} className="text-gray-400" />}
+              variant="filled"
+              className="bg-white border border-gray-200 hover:border-gray-300 focus:ring-1 focus:ring-green-400 focus:border-green-400 flex-1 min-w-[180px] rounded-md"
+              size="middle"
+            />
+
+            <button
+              className="px-4 py-2 bg-green-50 text-green-600 rounded-md hover:bg-green-100 transition-colors flex items-center gap-2 text-sm font-medium"
+              style={{ height: "40px" }}
+            >
+              <Plus size={16} />
+              <span>新增任务</span>
+            </button>
+          </div>
+
+          {/* 待办事项列表 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {todos.map((todo) => (
+              <div
+                key={todo.id}
+                className={`rounded-lg p-5 cursor-pointer transition-all duration-200 bg-white border ${
+                  todo.completed 
+                    ? "border-gray-100 opacity-80" 
+                    : "border-gray-100 hover:border-gray-200 hover:shadow-sm"
+                }`}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-start gap-2">
+                    {todo.completed ? (
+                      <CheckSquare size={18} className="text-green-500 mt-0.5 flex-shrink-0" />
+                    ) : (
+                      <Square size={18} className="text-gray-300 hover:text-gray-500 mt-0.5 flex-shrink-0" />
+                    )}
+                    <h3 className={`text-sm font-medium ${
+                      todo.completed ? "text-gray-400 line-through" : "text-gray-900"
+                    }`}>
+                      {todo.title}
+                    </h3>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    todo.priority === "高" 
+                      ? "bg-red-50 text-red-600" 
+                      : todo.priority === "中"
+                        ? "bg-yellow-50 text-yellow-600"
+                        : "bg-gray-50 text-gray-600"
+                  }`}>
+                    {todo.priority}优先级
+                  </span>
+                </div>
+
+                <div className="flex items-center text-xs text-gray-400 mt-3">
+                  <Calendar size={12} className="mr-1" />
+                  <span>截止：{todo.deadline}</span>
+                  {!todo.completed && todo.deadline.includes("昨天") && (
+                    <span className="ml-2 flex items-center text-red-400">
+                      <Flag size={12} className="mr-1" />
+                      已逾期
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     </main>
   );
