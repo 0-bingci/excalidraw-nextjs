@@ -4,9 +4,9 @@
 import { useState } from "react";
 import NotionSidebar from "@/components/home/Sidebar";
 // 导入页面组件
-import HomePage from "@/components/page/home";
-import InboxPage from "@/components/page/Inbox";
-import Board from "@/components/page/board";
+import HomePage from "@/page/home";
+import InboxPage from "@/page/Inbox";
+import Board from "@/page/board";
 
 export default function NotionWorkspace() {
   // 侧边栏折叠状态
