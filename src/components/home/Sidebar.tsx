@@ -116,13 +116,14 @@ export default function NotionSidebar({
 
         {/* 搜索框 */}
         <div className="px-3 pt-2 pb-1">
-          <Input
+          {/* <Input
             placeholder="搜索"
             prefix={<Search size={16} className="text-gray-400" />}
             variant="filled"
             className="bg-white/50 border-none hover:bg-white/80 focus:bg-white"
             style={{ backgroundColor: "rgba(255, 255, 255, 0.5)" }}
-          />
+          /> */}
+          <div className="px-2 border-none">天天开心呀~</div>
         </div>
 
         {/* 导航菜单 */}
