@@ -9,8 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "antd": "^5.22.6", 
     "@ant-design/nextjs-registry": "latest",
+    "@fortawesome/free-solid-svg-icons": "^7.1.0",
+    "@fortawesome/react-fontawesome": "^3.1.0",
+    "antd": "^5.22.6",
     "fabric": "^6.7.1",
     "fabricjs-react": "^1.2.2",
     "lucide-react": "^0.544.0",

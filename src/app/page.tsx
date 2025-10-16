@@ -7,6 +7,7 @@ import NotionSidebar from "@/components/home/Sidebar";
 import HomePage from "@/page/home";
 import InboxPage from "@/page/Inbox";
 import Board from "@/page/board";
+import Prompt from "@/page/prompt";
 
 export default function NotionWorkspace() {
   // 侧边栏折叠状态
@@ -21,6 +22,7 @@ export default function NotionWorkspace() {
     home: <HomePage />,
     inbox: <InboxPage />,
     board: <Board />,
+    prompt: <Prompt />,
   };
 
   // 切换侧边栏折叠状态
