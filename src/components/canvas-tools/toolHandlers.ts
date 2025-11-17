@@ -126,77 +126,97 @@ const rectangleToolHandler: ToolHandler = {
   }
 };
 
-// 圆形工具处理器
+// 圆形/椭圆工具处理器 - 重写实现：支持椭圆，鼠标起始点和当前位置始终在图形边上
 const circleToolHandler: ToolHandler = {
   onSelect: (canvas) => {
+    // 设置画布状态
     canvas.isDrawingMode = false;
     canvas.selection = false;
     canvas.defaultCursor = 'crosshair'; // 十字形光标
   },
-  //开始绘制
+  
+  // 开始绘制 - 记录起始点
   onStartDrawing: (canvas, x, y, state) => {
+    // 初始化绘制状态
     state.isDrawing = true;
-    state.startX = x;
+    state.startX = x;  // 记录鼠标按下的起始点
     state.startY = y;
     
-    // 创建初始圆形
-    state.currentShape = new fabric.Circle({
+    // 创建初始椭圆对象 - 以起始点为一个端点，初始大小为0
+    // 使用椭圆而不是圆形以支持绘制椭圆
+    state.currentShape = new fabric.Ellipse({
       left: x,
       top: y,
-      radius: 0,
+      rx: 0,  // 初始水平半径为0
+      ry: 0,  // 初始垂直半径为0
       fill: state.shapeProperties.fillColor,
       stroke: state.shapeProperties.strokeColor,
       strokeWidth: state.shapeProperties.strokeWidth,
-      selectable: true // 确保圆形可以被选择工具选中
+      selectable: true,
+      originX: 'center',  // 设置原点为中心
+      originY: 'center'
     });
     
+    // 添加椭圆到画布
     canvas.add(state.currentShape);
   },
-  //拖动鼠标时触发
+  
+  // 拖动鼠标时更新椭圆大小和位置
   onDrawing: (canvas, x, y, state) => {
-    //如果当前不是绘制状态或者没有当前图形对象，直接返回
+    // 验证绘制状态和当前图形
     if (!state.isDrawing || !state.currentShape) return;
     
-    // 计算鼠标距离起始点的距离作为半径
-    const dx = Math.abs(x - state.startX);
-    const dy = Math.abs(y - state.startY);
+    // 计算中心点（起始点和当前点的中点）
+    const centerX = (state.startX + x) / 2;
+    const centerY = (state.startY + y) / 2;
     
-    // 使用两点间距离公式计算半径
-    const radius = Math.sqrt(dx * dx + dy * dy);
+    // 计算水平半径和垂直半径（起始点到当前点距离的一半）
+    const rx = Math.abs(x - state.startX) / 2;
+    const ry = Math.abs(y - state.startY) / 2;
     
-    // 更新圆形的位置和半径
-    (state.currentShape as fabric.Circle).set({
-      left: Math.min(x, state.startX),
-      top: Math.min(y, state.startY),
-      radius: radius
+    // 更新椭圆的位置和尺寸
+    (state.currentShape as fabric.Ellipse).set({
+      left: centerX,
+      top: centerY,
+      rx: rx,
+      ry: ry
     });
     
-    //重新渲染画布
+    // 重新渲染画布以显示更新后的椭圆
     canvas.renderAll();
   },
-  // 绘制结束时触发
+  
+  // 绘制结束处理
   onEndDrawing: (canvas, state) => {
+    // 验证绘制状态和当前图形
     if (!state.isDrawing || !state.currentShape) return;
-    //绘制状态结束
+    
+    // 结束绘制状态
     state.isDrawing = false;
     
-    // 确保圆形至少有一定大小
-    const circle = state.currentShape as fabric.Circle;
-    if (circle.radius < 5) {
+    // 获取最终椭圆对象并验证大小
+    const ellipse = state.currentShape as fabric.Ellipse;
+    
+    // 如果椭圆太小，则移除
+    // 考虑椭圆的最小尺寸，确保有意义的绘制结果
+    if (ellipse.rx < 3 && ellipse.ry < 3) {
       canvas.remove(state.currentShape);
     }
     
-    //清空当前绘图对象
+    // 重置当前绘图对象
     state.currentShape = null;
-    //重新渲染画布
+    
+    // 重新渲染画布
     canvas.renderAll();
   },
+  
+  // 取消选择工具时的清理
   onDeselect: (canvas) => {
-    // 清理逻辑
+    // 可以在这里添加额外的清理逻辑
   }
 };
 
-// 菱形工具处理器
+// 菱形工具处理器，暂未处理，没有历史回退功能
 const diamondToolHandler: ToolHandler = {
   onSelect: (canvas) => {
     canvas.isDrawingMode = false;

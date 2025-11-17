@@ -53,12 +53,12 @@ export default function NotionSidebar({
     {
       key: "inbox",
       icon: <Inbox size={16} />,
-      label: "收件箱",
+      label: "消息",
     },
     { type: "divider" },
     {
-      key: "private",
-      label: "私人",
+      key: "tools",
+      label: "工具",
       type: "group",
       children: [
         {
@@ -66,21 +66,26 @@ export default function NotionSidebar({
           icon: <FileText size={16} />,
           label: "白板",
         },
-      ],
-    },
-    { type: "divider" },
-    {
-      key: "team",
-      label: "团队协作区",
-      type: "group",
-      children: [
         {
-          key: "team-home",
-          icon: <Home size={16} />,
-          label: "综合",
+          key: "prompt",
+          icon: <FileText size={16} />,
+          label: "提示词",
         },
       ],
     },
+    // { type: "divider" },
+    // {
+    //   key: "team",
+    //   label: "团队协作区",
+    //   type: "group",
+    //   children: [
+    //     {
+    //       key: "team-home",
+    //       icon: <Home size={16} />,
+    //       label: "综合",
+    //     },
+    //   ],
+    // },
   ];
 
   // 菜单点击事件处理
