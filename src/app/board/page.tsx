@@ -52,6 +52,7 @@ export default function ExcalidrawClone() {
   const [isVisible, setIsVisible] = useState(true);
   const [showLibrary, setShowLibrary] = useState(false);
   const [selectedObject, setSelectedObject] = useState<fabric.Object | null>(null); // 新增：选中对象状态
+  const [zoomLevel, setZoomLevel] = useState(1); // 新增：缩放级别状态
   
   // 右键菜单状态（仅保留核心状态）
   const [contextMenu, setContextMenu] = useState<{
@@ -73,7 +74,7 @@ export default function ExcalidrawClone() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvas = useRef<fabric.Canvas | null>(null);
-  const zoom = 100;
+
   const canvasToolsRef = useRef<any>(null);
 
 
@@ -136,6 +137,88 @@ const handleExportPng = () => {
       document.body.removeChild(link);
     }
   };
+
+  // 新增：放大功能，中心在屏幕中心点
+  const handleZoomIn = () => {
+    if (!canvas.current || !containerRef.current) return;
+    
+    const newZoom = Math.min(zoomLevel + 0.1, 5); // 最大缩放5倍
+    const { width, height } = containerRef.current.getBoundingClientRect();
+    const centerX = width / 2;
+    const centerY = height / 2;
+    
+    // 获取当前变换矩阵
+    const vpt = canvas.current.viewportTransform;
+    
+    // 计算新的变换矩阵，确保缩放中心在屏幕中心点
+    const scaleDiff = newZoom / zoomLevel;
+    
+    // 1. 将中心点转换为画布坐标
+    const canvasCenterX = centerX / zoomLevel - vpt[4] / zoomLevel;
+    const canvasCenterY = centerY / zoomLevel - vpt[5] / zoomLevel;
+    
+    // 2. 计算新的变换矩阵
+    const newVpt = [
+      newZoom,
+      vpt[1],
+      vpt[2],
+      newZoom,
+      centerX - canvasCenterX * newZoom,
+      centerY - canvasCenterY * newZoom
+    ];
+    
+    // 3. 设置新的变换矩阵
+    canvas.current.setViewportTransform(newVpt);
+    setZoomLevel(newZoom);
+  };
+
+  // 新增：缩小功能，中心在屏幕中心点
+  const handleZoomOut = () => {
+    if (!canvas.current || !containerRef.current) return;
+    
+    const newZoom = Math.max(zoomLevel - 0.1, 0.1); // 最小缩放0.1倍
+    const { width, height } = containerRef.current.getBoundingClientRect();
+    const centerX = width / 2;
+    const centerY = height / 2;
+    
+    // 获取当前变换矩阵
+    const vpt = canvas.current.viewportTransform;
+    
+    // 计算新的变换矩阵，确保缩放中心在屏幕中心点
+    const scaleDiff = newZoom / zoomLevel;
+    
+    // 1. 将中心点转换为画布坐标
+    const canvasCenterX = centerX / zoomLevel - vpt[4] / zoomLevel;
+    const canvasCenterY = centerY / zoomLevel - vpt[5] / zoomLevel;
+    
+    // 2. 计算新的变换矩阵
+    const newVpt = [
+      newZoom,
+      vpt[1],
+      vpt[2],
+      newZoom,
+      centerX - canvasCenterX * newZoom,
+      centerY - canvasCenterY * newZoom
+    ];
+    
+    // 3. 设置新的变换矩阵
+    canvas.current.setViewportTransform(newVpt);
+    setZoomLevel(newZoom);
+  };
+
+  // 新增：重置缩放功能
+  const handleResetZoom = () => {
+    if (!canvas.current || !containerRef.current) return;
+    
+    const { width, height } = containerRef.current.getBoundingClientRect();
+    
+    // 重置变换矩阵
+    canvas.current.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    setZoomLevel(1);
+  };
+
+
+
 
   // 处理属性更新 - 实现图层操作功能
   const handleUpdateProperty = (property: string, value: any) => {
@@ -509,18 +592,30 @@ const handleExportPng = () => {
         </button>
       </div>
 
-      {/* 左下角缩放控制（保留原有） */}
+      {/* 左下角缩放控制 */}
       <div className="absolute bottom-4 left-4 z-10">
-        <div className="bg-white rounded-lg shadow-lg border border-gray-200 px-2 py-2 flex items-center gap-1">
-          <button className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-md transition-all duration-150 group" title="缩小">
-            <ZoomOut size={16} className="text-gray-600 group-hover:text-gray-800 transition-colors" />
-          </button>
-          <button className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200 rounded transition-all duration-150 min-w-[50px] text-center font-medium" title="重置缩放">
-            {zoom}%
-          </button>
-          <button className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-md transition-all duration-150 group" title="放大">
-            <ZoomIn size={16} className="text-gray-600 group-hover:text-gray-800 transition-colors" />
-          </button>
+          <div className="bg-white rounded-lg shadow-lg border border-gray-200 px-2 py-2 flex items-center gap-1">
+            <button 
+              className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-md transition-all duration-150 group" 
+              title="缩小" 
+              onClick={handleZoomOut}
+            >
+              <ZoomOut size={16} className="text-gray-600 group-hover:text-gray-800 transition-colors" />
+            </button>
+            <button 
+              className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200 rounded transition-all duration-150 min-w-[50px] text-center font-medium" 
+              title="重置缩放" 
+              onClick={handleResetZoom}
+            >
+              {Math.round(zoomLevel * 100)}%
+            </button>
+            <button 
+              className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-md transition-all duration-150 group" 
+              title="放大" 
+              onClick={handleZoomIn}
+            >
+              <ZoomIn size={16} className="text-gray-600 group-hover:text-gray-800 transition-colors" />
+            </button>
           <div className="w-px h-6 bg-gray-300 mx-1" />
           <button className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-md transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed" title="撤销">
             <Undo size={16} className="text-gray-600 group-hover:text-gray-800 transition-colors" />

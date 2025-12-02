@@ -694,8 +694,17 @@ const handToolHandler: ToolHandler = {
     
     if (handToolState) {
       handToolState.isPanning = true;
-      handToolState.lastPosX = x;
-      handToolState.lastPosY = y;
+      // 尝试获取真实的屏幕坐标
+      const currentEvent = (state as any).currentEvent;
+      if (currentEvent && currentEvent.clientX && currentEvent.clientY) {
+        // 使用真实的屏幕坐标
+        handToolState.lastPosX = currentEvent.clientX;
+        handToolState.lastPosY = currentEvent.clientY;
+      } else {
+        // 回退到使用画布坐标
+        handToolState.lastPosX = x;
+        handToolState.lastPosY = y;
+      }
       canvas.defaultCursor = 'grabbing'; // 拖动中光标
       
       // 再次确保没有选中任何对象
@@ -707,16 +716,31 @@ const handToolHandler: ToolHandler = {
     
     const handToolState = (canvas as any)._handTool;
     if (handToolState && handToolState.isPanning) {
-      // 计算移动距离
-      const deltaX = x - handToolState.lastPosX;
-      const deltaY = y - handToolState.lastPosY;
+      // 尝试获取真实的屏幕坐标
+      const currentEvent = (state as any).currentEvent;
+      let currentPosX, currentPosY;
       
-      // 更新画布视口位置
+      if (currentEvent && currentEvent.clientX && currentEvent.clientY) {
+        // 使用真实的屏幕坐标
+        currentPosX = currentEvent.clientX;
+        currentPosY = currentEvent.clientY;
+      } else {
+        // 回退到使用画布坐标
+        currentPosX = x;
+        currentPosY = y;
+      }
+      
+      // 计算屏幕坐标的偏移量
+      const deltaX = currentPosX - handToolState.lastPosX;
+      const deltaY = currentPosY - handToolState.lastPosY;
+      
+      // 直接使用屏幕坐标偏移量进行相对平移
+      // relativePan会自动处理视图变换矩阵，不需要额外的缩放计算
       canvas.relativePan(new fabric.Point(deltaX, deltaY));
       
       // 更新最后位置
-      handToolState.lastPosX = x;
-      handToolState.lastPosY = y;
+      handToolState.lastPosX = currentPosX;
+      handToolState.lastPosY = currentPosY;
       
       // 使用requestRenderAll替代renderAll以优化性能，减少残影
       canvas.requestRenderAll();

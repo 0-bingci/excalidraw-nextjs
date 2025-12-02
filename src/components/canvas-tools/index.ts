@@ -77,6 +77,8 @@ export const initializeCanvasTools = (
         }
         // 第一步：首次点击空白处，创建文本框并设置状态
         const pointer = canvas.getPointer(options.e);
+        // 保存当前事件到toolState，以便handToolHandler使用
+        (toolState as any).currentEvent = options.e;
         handleMouseDown(canvas, pointer.x, pointer.y, toolState);
         // 设置文本工具等待退出状态
         toolState.textToolWaitingForExit = true;
@@ -86,11 +88,15 @@ export const initializeCanvasTools = (
     
     // 执行正常的鼠标按下处理
     const pointer = canvas.getPointer(options.e);
+    // 保存当前事件到toolState，以便handToolHandler使用
+    (toolState as any).currentEvent = options.e;
     handleMouseDown(canvas, pointer.x, pointer.y, toolState);
   };
   
   const onMouseMove = (options: any): void => {
     const pointer = canvas.getPointer(options.e);
+    // 保存当前事件到toolState，以便handToolHandler使用
+    (toolState as any).currentEvent = options.e;
     handleMouseMove(canvas, pointer.x, pointer.y, toolState);
   };
   
