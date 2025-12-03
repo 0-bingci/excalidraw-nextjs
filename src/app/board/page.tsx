@@ -236,11 +236,11 @@ const handleExportPng = () => {
         selectedObject.set(property, value);
         break;
         
-      // 复制对象功能 - 按照Fabric.js推荐的异步克隆方式实现
+      // 复制对象功能 - 使用Fabric.js 6.x的Promise形式clone方法
       case 'copy':
         try {
-          // 使用Fabric.js的异步clone方法
-          selectedObject.clone((clonedObj: fabric.Object) => {
+          // 使用Fabric.js 6.x的Promise形式clone方法
+          selectedObject.clone().then((clonedObj: fabric.Object) => {
             // 调整克隆对象位置（向右下方偏移20px，避免重叠）
             if (typeof clonedObj.left === 'number' && typeof clonedObj.top === 'number') {
               clonedObj.set({
@@ -272,11 +272,9 @@ const handleExportPng = () => {
             
             // 重新渲染整个画布
             canvas.current?.renderAll();
-          });
-        } catch (error) {
-          console.error('复制功能错误:', error);
-          // 保持原有的备用方案
-          try {
+          }).catch((error) => {
+            console.error('克隆对象失败:', error);
+            // 保持原有的备用方案
             if (canvas.current) {
               const json = selectedObject.toJSON(['selectable', 'editable', 'lockMovementX', 'lockMovementY']);
               fabric.util.enlivenObjects([json], (objects) => {
@@ -295,9 +293,9 @@ const handleExportPng = () => {
                 canvas.current?.renderAll();
               });
             }
-          } catch (fallbackError) {
-            console.error('复制功能替代方法也失败:', fallbackError);
-          }
+          });
+        } catch (error) {
+          console.error('复制功能错误:', error);
         }
         break;
         
