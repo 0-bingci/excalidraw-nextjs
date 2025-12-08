@@ -32,18 +32,7 @@ import {
   Eye,
 } from "lucide-react";
 
-// 绘图元素类型定义（保留原有）
-interface DrawingElement {
-  id: string;
-  type: Tool;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  strokeColor: string;
-  fillColor: string;
-  strokeWidth: number;
-}
+
 
 export default function ExcalidrawClone() {
   // 状态管理（保留原有）
@@ -75,7 +64,9 @@ export default function ExcalidrawClone() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvas = useRef<fabric.Canvas | null>(null);
 
-  const canvasToolsRef = useRef<any>(null);
+  // 定义canvasToolsRef的类型
+  type CanvasTools = ReturnType<typeof initializeCanvasTools>;
+  const canvasToolsRef = useRef<CanvasTools | null>(null);
 
 
   // -------------------------- 新增：AI对话框相关回调函数 --------------------------
@@ -138,6 +129,461 @@ const handleExportPng = () => {
     }
   };
 
+  // 预设的JSON数据
+  const importJson = 
+{
+  "version": "6.7.1",
+  "objects": [
+    {
+      "rx": 20,
+      "ry": 20,
+      "type": "Ellipse",
+      "version": "6.7.1",
+      "originX": "left",
+      "originY": "top",
+      "left": 100,
+      "top": 50,
+      "width": 100,
+      "height": 50,
+      "fill": "#e8f4fd",
+      "stroke": "#206bc4",
+      "strokeWidth": 2,
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "center",
+      "left": 150,
+      "top": 75,
+      "text": "开始",
+      "fontSize": 16,
+      "fill": "#333",
+      "fontFamily": "Arial",
+      "visible": true
+    },
+    {
+      "type": "Rect",
+      "version": "6.7.1",
+      "originX": "left",
+      "originY": "top",
+      "left": 100,
+      "top": 130,
+      "width": 200,
+      "height": 80,
+      "fill": "#f5fafe",
+      "stroke": "#206bc4",
+      "strokeWidth": 2,
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "center",
+      "left": 200,
+      "top": 170,
+      "text": "选择班级与科目",
+      "fontSize": 14,
+      "fill": "#333",
+      "fontFamily": "Arial",
+      "visible": true,
+      "textAlign": "center"
+    },
+    {
+      "type": "Rect",
+      "version": "6.7.1",
+      "originX": "left",
+      "originY": "top",
+      "left": 100,
+      "top": 240,
+      "width": 200,
+      "height": 80,
+      "fill": "#f5fafe",
+      "stroke": "#206bc4",
+      "strokeWidth": 2,
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "center",
+      "left": 200,
+      "top": 280,
+      "text": "输入学生成绩信息",
+      "fontSize": 14,
+      "fill": "#333",
+      "fontFamily": "Arial",
+      "visible": true,
+      "textAlign": "center"
+    },
+    {
+      "type": "Polygon",
+      "version": "6.7.1",
+      "originX": "left",
+      "originY": "top",
+      "left": 100,
+      "top": 350,
+      "width": 200,
+      "height": 80,
+      "points": [{"x": 100, "y": 390}, {"x": 200, "y": 350}, {"x": 300, "y": 390}, {"x": 200, "y": 430}],
+      "fill": "#fef7fb",
+      "stroke": "#e53e3e",
+      "strokeWidth": 2,
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "center",
+      "left": 200,
+      "top": 390,
+      "text": "成绩格式是否正确？",
+      "fontSize": 14,
+      "fill": "#333",
+      "fontFamily": "Arial",
+      "visible": true,
+      "textAlign": "center"
+    },
+    {
+      "type": "Rect",
+      "version": "6.7.1",
+      "originX": "left",
+      "originY": "top",
+      "left": 350,
+      "top": 350,
+      "width": 180,
+      "height": 80,
+      "fill": "#fef2f2",
+      "stroke": "#e53e3e",
+      "strokeWidth": 2,
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "center",
+      "left": 440,
+      "top": 390,
+      "text": "提示格式错误\n重新输入",
+      "fontSize": 14,
+      "fill": "#333",
+      "fontFamily": "Arial",
+      "visible": true,
+      "textAlign": "center"
+    },
+    {
+      "type": "Polygon",
+      "version": "6.7.1",
+      "originX": "left",
+      "originY": "top",
+      "left": 100,
+      "top": 460,
+      "width": 200,
+      "height": 80,
+      "points": [{"x": 100, "y": 500}, {"x": 200, "y": 460}, {"x": 300, "y": 500}, {"x": 200, "y": 540}],
+      "fill": "#fef7fb",
+      "stroke": "#e53e3e",
+      "strokeWidth": 2,
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "center",
+      "left": 200,
+      "top": 500,
+      "text": "成绩是否超出范围？",
+      "fontSize": 14,
+      "fill": "#333",
+      "fontFamily": "Arial",
+      "visible": true,
+      "textAlign": "center"
+    },
+    {
+      "type": "Rect",
+      "version": "6.7.1",
+      "originX": "left",
+      "originY": "top",
+      "left": 350,
+      "top": 460,
+      "width": 180,
+      "height": 80,
+      "fill": "#fef2f2",
+      "stroke": "#e53e3e",
+      "strokeWidth": 2,
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "center",
+      "left": 440,
+      "top": 500,
+      "text": "提示范围错误\n重新输入",
+      "fontSize": 14,
+      "fill": "#333",
+      "fontFamily": "Arial",
+      "visible": true,
+      "textAlign": "center"
+    },
+    {
+      "type": "Rect",
+      "version": "6.7.1",
+      "originX": "left",
+      "originY": "top",
+      "left": 100,
+      "top": 570,
+      "width": 200,
+      "height": 80,
+      "fill": "#f0fdf4",
+      "stroke": "#10b981",
+      "strokeWidth": 2,
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "center",
+      "left": 200,
+      "top": 610,
+      "text": "保存成绩信息\n至系统数据库",
+      "fontSize": 14,
+      "fill": "#333",
+      "fontFamily": "Arial",
+      "visible": true,
+      "textAlign": "center"
+    },
+    {
+      "type": "Ellipse",
+      "version": "6.7.1",
+      "rx": 20,
+      "ry": 20,
+      "originX": "left",
+      "originY": "top",
+      "left": 100,
+      "top": 680,
+      "width": 100,
+      "height": 50,
+      "fill": "#e8f4fd",
+      "stroke": "#206bc4",
+      "strokeWidth": 2,
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "center",
+      "left": 150,
+      "top": 705,
+      "text": "结束",
+      "fontSize": 16,
+      "fill": "#333",
+      "fontFamily": "Arial",
+      "visible": true
+    },
+    {
+      "type": "Line",
+      "version": "6.7.1",
+      "x1": 150,
+      "y1": 100,
+      "x2": 150,
+      "y2": 130,
+      "stroke": "#666",
+      "strokeWidth": 2,
+      "strokeLineCap": "round",
+      "visible": true
+    },
+    {
+      "type": "Line",
+      "version": "6.7.1",
+      "x1": 200,
+      "y1": 210,
+      "x2": 200,
+      "y2": 240,
+      "stroke": "#666",
+      "strokeWidth": 2,
+      "strokeLineCap": "round",
+      "visible": true
+    },
+    {
+      "type": "Line",
+      "version": "6.7.1",
+      "x1": 200,
+      "y1": 320,
+      "x2": 200,
+      "y2": 350,
+      "stroke": "#666",
+      "strokeWidth": 2,
+      "strokeLineCap": "round",
+      "visible": true
+    },
+    {
+      "type": "Line",
+      "version": "6.7.1",
+      "x1": 300,
+      "y1": 390,
+      "x2": 350,
+      "y2": 390,
+      "stroke": "#666",
+      "strokeWidth": 2,
+      "strokeLineCap": "round",
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "bottom",
+      "left": 325,
+      "top": 380,
+      "text": "否",
+      "fontSize": 12,
+      "fill": "#666",
+      "fontFamily": "Arial",
+      "visible": true
+    },
+    {
+      "type": "Line",
+      "version": "6.7.1",
+      "x1": 200,
+      "y1": 430,
+      "x2": 200,
+      "y2": 460,
+      "stroke": "#666",
+      "strokeWidth": 2,
+      "strokeLineCap": "round",
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "bottom",
+      "left": 180,
+      "top": 420,
+      "text": "是",
+      "fontSize": 12,
+      "fill": "#666",
+      "fontFamily": "Arial",
+      "visible": true
+    },
+    {
+      "type": "Line",
+      "version": "6.7.1",
+      "x1": 440,
+      "y1": 390,
+      "x2": 200,
+      "y2": 240,
+      "stroke": "#666",
+      "strokeWidth": 2,
+      "strokeLineCap": "round",
+      "strokeDashArray": [5,5],
+      "visible": true
+    },
+    {
+      "type": "Line",
+      "version": "6.7.1",
+      "x1": 300,
+      "y1": 500,
+      "x2": 350,
+      "y2": 500,
+      "stroke": "#666",
+      "strokeWidth": 2,
+      "strokeLineCap": "round",
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "bottom",
+      "left": 325,
+      "top": 490,
+      "text": "是",
+      "fontSize": 12,
+      "fill": "#666",
+      "fontFamily": "Arial",
+      "visible": true
+    },
+    {
+      "type": "Line",
+      "version": "6.7.1",
+      "x1": 200,
+      "y1": 540,
+      "x2": 200,
+      "y2": 570,
+      "stroke": "#666",
+      "strokeWidth": 2,
+      "strokeLineCap": "round",
+      "visible": true
+    },
+    {
+      "type": "Text",
+      "version": "6.7.1",
+      "originX": "center",
+      "originY": "bottom",
+      "left": 180,
+      "top": 530,
+      "text": "否",
+      "fontSize": 12,
+      "fill": "#666",
+      "fontFamily": "Arial",
+      "visible": true
+    },
+    {
+      "type": "Line",
+      "version": "6.7.1",
+      "x1": 440,
+      "y1": 500,
+      "x2": 200,
+      "y2": 240,
+      "stroke": "#666",
+      "strokeWidth": 2,
+      "strokeLineCap": "round",
+      "strokeDashArray": [5,5],
+      "visible": true
+    },
+    {
+      "type": "Line",
+      "version": "6.7.1",
+      "x1": 200,
+      "y1": 650,
+      "x2": 150,
+      "y2": 680,
+      "stroke": "#666",
+      "strokeWidth": 2,
+      "strokeLineCap": "round",
+      "visible": true
+    }
+  ],
+  "background": "#f0f0f0"
+}
+
+  const handleImport = () => { 
+    canvas.current?.loadFromJSON(importJson); 
+    setTimeout(() => { 
+      canvas.current?.renderAll(); 
+    }, 100); 
+  };
+
   // 新增：放大功能，中心在屏幕中心点
   const handleZoomIn = () => {
     if (!canvas.current || !containerRef.current) return;
@@ -150,15 +596,12 @@ const handleExportPng = () => {
     // 获取当前变换矩阵
     const vpt = canvas.current.viewportTransform;
     
-    // 计算新的变换矩阵，确保缩放中心在屏幕中心点
-    const scaleDiff = newZoom / zoomLevel;
-    
     // 1. 将中心点转换为画布坐标
     const canvasCenterX = centerX / zoomLevel - vpt[4] / zoomLevel;
     const canvasCenterY = centerY / zoomLevel - vpt[5] / zoomLevel;
     
     // 2. 计算新的变换矩阵
-    const newVpt = [
+    const newVpt: [number, number, number, number, number, number] = [
       newZoom,
       vpt[1],
       vpt[2],
@@ -184,15 +627,12 @@ const handleExportPng = () => {
     // 获取当前变换矩阵
     const vpt = canvas.current.viewportTransform;
     
-    // 计算新的变换矩阵，确保缩放中心在屏幕中心点
-    const scaleDiff = newZoom / zoomLevel;
-    
     // 1. 将中心点转换为画布坐标
     const canvasCenterX = centerX / zoomLevel - vpt[4] / zoomLevel;
     const canvasCenterY = centerY / zoomLevel - vpt[5] / zoomLevel;
     
     // 2. 计算新的变换矩阵
-    const newVpt = [
+    const newVpt: [number, number, number, number, number, number] = [
       newZoom,
       vpt[1],
       vpt[2],
@@ -208,9 +648,7 @@ const handleExportPng = () => {
 
   // 新增：重置缩放功能
   const handleResetZoom = () => {
-    if (!canvas.current || !containerRef.current) return;
-    
-    const { width, height } = containerRef.current.getBoundingClientRect();
+    if (!canvas.current) return;
     
     // 重置变换矩阵
     canvas.current.setViewportTransform([1, 0, 0, 1, 0, 0]);
@@ -652,6 +1090,8 @@ const handleExportPng = () => {
           onOpenAiDialog={handleOpenAiDialog}
           onClearCanvas={handleClearCanvas}
           onExportPng={handleExportPng}
+          onImport={handleImport}
+          onToggleViewMode={() => {}}
         />
 
         {/* 2. 新增：AI对话框组件（传递所有必要Props） */}
