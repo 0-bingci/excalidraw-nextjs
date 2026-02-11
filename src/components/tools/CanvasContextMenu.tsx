@@ -12,6 +12,7 @@ interface CanvasContextMenuProps {
   onExportPng: () => void;
   onToggleViewMode: () => void;
   onImport: () => void;
+  fileInputRef: React.RefObject<HTMLInputElement>;
 }
 
 const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({
@@ -23,6 +24,7 @@ const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({
   onExportPng,
   onToggleViewMode,
   onImport,
+  fileInputRef,
 }) => {
   if (!visible) return null;
 
@@ -98,11 +100,20 @@ const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({
         <span>清空画布</span>
       </button>
       {/* 导入按钮 */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: "none" }}
+        accept=".json,image/png,image/jpeg"
+        onChange={onImport}
+      />
       <button
         className={buttonStyle}
         onClick={() => {
-          onClose();
-          onImport();
+          // 不需要 onClose 也可以，或者先关闭弹窗
+          onClose?.();
+          // 核心：点击按钮转而触发 input 的点击
+          fileInputRef.current?.click();
         }}
       >
         <svg
@@ -172,28 +183,28 @@ const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({
 
       {/* 返回首页按钮 */}
       <Link href="/">
-      <button
-        className={buttonStyle}
-        onClick={() => {
-          onClose();
-        }}
-      >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+        <button
+          className={buttonStyle}
+          onClick={() => {
+            onClose();
+          }}
         >
-          <path d="M12 2L5 8l7 4 7-4-7-6z" />
-          <path d="M5 8h14v10H5z" />
-          <rect x="10" y="13" width="4" height="5" rx="1" />
-        </svg>
-        <span>保存并返回首页</span>
-      </button>
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 2L5 8l7 4 7-4-7-6z" />
+            <path d="M5 8h14v10H5z" />
+            <rect x="10" y="13" width="4" height="5" rx="1" />
+          </svg>
+          <span>保存并返回首页</span>
+        </button>
       </Link>
     </div>
   );

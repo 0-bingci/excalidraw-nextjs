@@ -6,20 +6,14 @@ import {
   Home,
   Inbox,
   FileText,
-  Plus,
   ChevronDown,
   Settings,
-  ShoppingBag,
-  Trash2,
-  Users,
-  X,
-  MessageSquare,
   HelpCircle,
   PenSquare,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { Menu, Input, Button, Badge, Tooltip } from "antd";
+import { Menu, Input, Button, Tooltip } from "antd";
 import type { MenuProps } from "antd";
 
 // 菜单项类型定义
@@ -159,7 +153,11 @@ export default function NotionSidebar({
         <div className="border-t border-gray-200 p-2 flex items-center justify-between">
           <div className="flex items-center gap-1">
             <Tooltip title="设置">
-              <Button type="text" icon={<Settings size={18} />} className="text-gray-500 hover:bg-gray-200/50" />
+              <Button
+                type="text"
+                icon={<Settings size={18} />}
+                className="text-gray-500 hover:bg-gray-200/50"
+              />
             </Tooltip>
             {/* <Tooltip title="市集">
               <Button type="text" icon={<ShoppingBag size={18} />} className="text-gray-500 hover:bg-gray-200/50" />
@@ -175,7 +173,11 @@ export default function NotionSidebar({
               </Badge>
             </Tooltip> */}
             <Tooltip title="帮助">
-              <Button type="text" icon={<HelpCircle size={18} />} className="text-gray-500 hover:bg-gray-200/50" />
+              <Button
+                type="text"
+                icon={<HelpCircle size={18} />}
+                className="text-gray-500 hover:bg-gray-200/50"
+              />
             </Tooltip>
           </div>
         </div>

@@ -9,10 +9,13 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "antd": "^5.22.6", 
     "@ant-design/nextjs-registry": "latest",
+    "@langchain/core": "^1.1.20",
+    "@langchain/openai": "^1.2.6",
+    "antd": "^5.22.6",
     "fabric": "^6.7.1",
     "fabricjs-react": "^1.2.2",
+    "langchain": "^1.2.19",
     "lucide-react": "^0.544.0",
     "next": "15.5.3",
     "react": "19.1.0",
