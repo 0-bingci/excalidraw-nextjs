@@ -26,18 +26,18 @@ import {
   Share2,
   ZoomIn,
   ZoomOut,
-  Undo,
-  Redo,
-  Lock,
-  Eye,
+  // Undo,
+  // Redo,
+  // Lock,
+  // Eye,
 } from "lucide-react";
 
 export default function ExcalidrawClone() {
   // 状态管理（保留原有）
   const [selectedTool, setSelectedTool] = useState<Tool>("select");
-  const [isLocked, setIsLocked] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
-  const [showLibrary, setShowLibrary] = useState(false);
+  // const [isLocked, setIsLocked] = useState(false);
+  // const [isVisible, setIsVisible] = useState(true);
+  // const [showLibrary, setShowLibrary] = useState(false);
   const [selectedObject, setSelectedObject] = useState<fabric.Object | null>(
     null,
   ); // 新增：选中对象状态
@@ -78,7 +78,7 @@ export default function ExcalidrawClone() {
     y: number;
     input: string;
     messages: { type: "user" | "ai"; content: string }[];
-    metadata: any; // 👈 新增：存储当前画布 JSON
+    metadata: string | null; // 👈 新增：存储当前画布 JSON 字符串
   }>({
     visible: false,
     x: 0,
@@ -237,10 +237,6 @@ export default function ExcalidrawClone() {
 
     // 重置 input，允许重复上传同一个文件
     e.target.value = "";
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
   };
 
   // 新增：放大功能，中心在屏幕中心点
