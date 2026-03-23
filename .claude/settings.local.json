@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"TODO\\\\|FIXME\\\\|NOTE\" /d/University/code/excalidraw-nextjs/src --include=*.ts --include=*.tsx)",
+      "Bash(npx tsc:*)",
+      "Bash(cd:*)",
+      "Bash(ls \"D:/University/code/excalidraw-nextjs/.env\"*)",
+      "Bash(npm install:*)",
+      "Bash(timeout 3 node server/yjs-server.mjs)",
+      "Bash(npm run:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(taskkill //F //FI 'WINDOWTITLE eq *yjs*')",
+      "Bash(netstat -ano)",
+      "Bash(find D:Universitycodeexcalidraw-nextjs -maxdepth 1 -type f -name *.md -o -name *.txt -o -name .gitignore)"
+    ]
+  }
+}

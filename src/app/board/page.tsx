@@ -5,10 +5,16 @@ import * as fabric from "fabric";
 import { useState, useRef, useEffect } from "react";
 import { initializeCanvasTools } from "@/components/canvas-tools";
 import { Tool } from "@/components/canvas-tools/types";
+import { useCanvasHistory } from "@/hooks/useCanvasHistory";
 // 导入两个独立组件
+import { AIAssistantPanel } from "@/components/agent/AIAssistantPanel";
 import CanvasContextMenu from "@/components/tools/CanvasContextMenu";
 import CanvasAiDialog from "@/components/tools/CanvasAiDialog"; // 新增：导入AI对话框组件
-import ShapePropertiesPanel from "@/components/tools/ShapePropertiesPanel"; // 新增：导入属性面板组件
+import ShapePropertiesPanel from "@/components/tools/ShapePropertiesPanel";
+import ShareMenu from "@/components/tools/ShareMenu";
+import UserAvatars from "@/components/collaboration/UserAvatars";
+import { useCollaboration } from "@/hooks/useCollaboration";
+import { compressToEncodedURIComponent } from "lz-string";
 // 图标组件导入
 import {
   MousePointer2,
@@ -26,14 +32,20 @@ import {
   Share2,
   ZoomIn,
   ZoomOut,
-  // Undo,
-  // Redo,
+  Undo,
+  Redo,
   // Lock,
   // Eye,
 } from "lucide-react";
 
 export default function ExcalidrawClone() {
   // 状态管理（保留原有）
+  const [isAiOpen, setIsAiOpen] = useState(false);
+  const [sidebarMessages, setSidebarMessages] = useState<
+    { id: string; role: "user" | "assistant"; content: string; status?: "loading" | "error" }[]
+  >([]);
+  // 保存侧栏对话历史（用于多轮上下文）
+  const sidebarHistoryRef = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
   const [selectedTool, setSelectedTool] = useState<Tool>("select");
   // const [isLocked, setIsLocked] = useState(false);
   // const [isVisible, setIsVisible] = useState(true);
@@ -41,7 +53,8 @@ export default function ExcalidrawClone() {
   const [selectedObject, setSelectedObject] = useState<fabric.Object | null>(
     null,
   ); // 新增：选中对象状态
-  const [zoomLevel, setZoomLevel] = useState(1); // 新增：缩放级别状态
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [shareMenuVisible, setShareMenuVisible] = useState(false);
 
   // 右键菜单状态（仅保留核心状态）
   const [contextMenu, setContextMenu] = useState<{
@@ -54,10 +67,89 @@ export default function ExcalidrawClone() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvas = useRef<fabric.Canvas | null>(null);
+  const [canvasInstance, setCanvasInstance] = useState<fabric.Canvas | null>(null);
 
   // 定义canvasToolsRef的类型
   type CanvasTools = ReturnType<typeof initializeCanvasTools>;
   const canvasToolsRef = useRef<CanvasTools | null>(null);
+
+  // Collaboration
+  const {
+    isConnected,
+    roomId,
+    connectedUsers,
+    joinRoom,
+    leaveRoom,
+    createRoom,
+    isRemoteRef,
+  } = useCollaboration(canvasInstance, containerRef);
+
+  // Undo/Redo 历史管理 (skip remote Yjs updates)
+  const { undo, redo, canUndo, canRedo, saveState } = useCanvasHistory(canvasInstance, isRemoteRef);
+
+  // -------------------------- AI 侧栏发送逻辑 --------------------------
+  const handleSidebarSendMessage = async (userContent: string) => {
+    const userMsgId = `user-${Date.now()}`;
+    const aiMsgId = `ai-${Date.now()}`;
+
+    // 添加用户消息和 loading 占位
+    setSidebarMessages((prev) => [
+      ...prev,
+      { id: userMsgId, role: "user", content: userContent },
+      { id: aiMsgId, role: "assistant", content: "", status: "loading" },
+    ]);
+
+    // 记录到历史
+    sidebarHistoryRef.current.push({ role: "user", content: userContent });
+
+    try {
+      const currentCanvasJson = canvas.current?.toJSON();
+      const response = await fetch("/api/generateChart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          metadata: currentCanvasJson,
+          description: userContent,
+          history: sidebarHistoryRef.current.slice(-10), // 最近 5 轮对话
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "生成失败");
+      }
+
+      // 更新画布
+      if (canvas.current && result.fabricJson) {
+        canvas.current.loadFromJSON(result.fabricJson).then(() => {
+          canvas.current?.renderAll();
+          // 保存到 undo 历史
+          setTimeout(() => saveState(), 100);
+        });
+      }
+
+      const aiReply = result.aiMessage || "图形已生成并更新到画布";
+      sidebarHistoryRef.current.push({ role: "assistant", content: aiReply });
+
+      setSidebarMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === aiMsgId
+            ? { ...msg, content: aiReply, status: undefined }
+            : msg,
+        ),
+      );
+    } catch (error: any) {
+      console.error("AI 侧栏错误:", error);
+      setSidebarMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === aiMsgId
+            ? { ...msg, content: `生成失败：${error.message}`, status: "error" }
+            : msg,
+        ),
+      );
+    }
+  };
 
   // -------------------------- 新增：AI对话框相关回调函数 --------------------------
   // 1. 关闭AI对话框
@@ -101,73 +193,61 @@ export default function ExcalidrawClone() {
     }));
   };
 
-  // 3. 发送 AI 消息（调用你的 /api/generate-chart 接口）
-  const handleAiSendMessage = async (userContent: string) => {
+  // 3. AI dialog send (right-click dialog)
+  const handleAiDialogSendMessage = async (userContent: string) => {
     if (!aiDialog.metadata) {
-      alert("未获取到画布数据，请重试");
+      alert("No canvas data");
       return;
     }
 
-    // 先更新 UI：显示加载中
     setAiDialog((prev) => ({
       ...prev,
       input: "",
       messages: [
         ...prev.messages,
-        { type: "user", content: userContent },
-        { type: "ai", content: "正在生成图形，请稍候..." },
+        { type: "user" as const, content: userContent },
+        { type: "ai" as const, content: "Generating..." },
       ],
     }));
 
     try {
-      // 调用你的 Next.js API
-      const response = await fetch("/api/generateChart", {
+      const resp = await fetch("/api/generateChart", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          metadata: aiDialog.metadata, // 原始画布数据
-          description: userContent, // 用户描述（如“创建卡通狮子...”）
+          metadata: aiDialog.metadata,
+          description: userContent,
         }),
       });
 
-      const result = await response.json();
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || "Failed");
 
-      if (!response.ok) {
-        throw new Error(result.error || "生成失败");
-      }
-
-      // 成功：用新数据更新画布
       if (canvas.current && result.fabricJson) {
-        canvas.current.loadFromJSON(result.fabricJson, () => {
+        canvas.current.loadFromJSON(result.fabricJson).then(() => {
           canvas.current?.renderAll();
+          setTimeout(() => saveState(), 100);
         });
-        setTimeout(() => {
-          canvas.current?.renderAll();
-        }, 100);
       }
 
-      // 更新对话记录
-      setAiDialog((prev) => ({
-        ...prev,
-        messages: [
-          ...prev.messages.slice(0, -1), // 移除“正在生成...”
-          { type: "ai", content: "✅ 图形已成功生成并更新到画布！" },
-        ],
-      }));
-
-      // 可选：3秒后自动关闭对话框
-      setTimeout(() => {
-        setAiDialog((prev) => ({ ...prev, visible: false }));
-      }, 3000);
-    } catch (error: any) {
-      console.error("AI 生成错误:", error);
       setAiDialog((prev) => ({
         ...prev,
         messages: [
           ...prev.messages.slice(0, -1),
-          { type: "ai", content: `❌ 生成失败：${error.message}` },
+          { type: "ai" as const, content: "Generated successfully" },
+        ],
+      }));
+
+      setTimeout(() => {
+        setAiDialog((prev) => ({ ...prev, visible: false }));
+      }, 3000);
+    } catch (error: any) {
+      console.error("AI dialog error:", error);
+      setAiDialog((prev) => ({
+        ...prev,
+        messages: [
+          ...prev.messages.slice(0, -1),
+          { type: "ai" as const, content: "Failed: " + error.message },
         ],
       }));
     }
@@ -178,6 +258,7 @@ export default function ExcalidrawClone() {
       canvas.current.clear(); // 清空所有对象
       canvas.current.backgroundColor = "#f0f0f0"; // 恢复背景色（根据你的初始设置）
       canvas.current.renderAll(); // 重新渲染
+      saveState(); // 清空后保存状态（同步到 localStorage）
     }
   };
 
@@ -197,6 +278,34 @@ export default function ExcalidrawClone() {
       link.click();
       document.body.removeChild(link);
     }
+  };
+
+  // Share: copy canvas as PNG image to clipboard
+  const handleCopyImage = async () => {
+    if (!canvas.current) return;
+    canvas.current.renderAll();
+    const dataUrl = canvas.current.toDataURL({ multiplier: 2 });
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": blob }),
+    ]);
+  };
+
+  // Share: copy shareable link with canvas data encoded in URL hash
+  const handleCopyLink = async () => {
+    if (!canvas.current) return;
+    const json = JSON.stringify(canvas.current.toJSON());
+    const compressed = compressToEncodedURIComponent(json);
+    const url = window.location.origin + "/board#data=" + compressed;
+    await navigator.clipboard.writeText(url);
+  };
+
+  // Share: copy canvas JSON to clipboard
+  const handleCopyJson = () => {
+    if (!canvas.current) return;
+    const json = JSON.stringify(canvas.current.toJSON(), null, 2);
+    navigator.clipboard.writeText(json);
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -558,6 +667,7 @@ export default function ExcalidrawClone() {
       centeredScaling: true,
       selection: false,
     });
+    setCanvasInstance(canvas.current);
 
     const setCanvasDimensions = () => {
       if (canvasRef.current && canvas.current && containerRef.current) {
@@ -578,6 +688,25 @@ export default function ExcalidrawClone() {
       },
     );
     canvasToolsRef.current.setupEventListeners();
+
+    // Restore canvas from shared URL hash (e.g. /board#data=...)
+    const hash = window.location.hash;
+    if (hash.startsWith("#data=")) {
+      import("lz-string").then(({ decompressFromEncodedURIComponent }) => {
+        try {
+          const compressed = hash.slice(6);
+          const json = decompressFromEncodedURIComponent(compressed);
+          if (json && canvas.current) {
+            canvas.current.loadFromJSON(json).then(() => {
+              canvas.current?.renderAll();
+            });
+            window.history.replaceState(null, "", window.location.pathname);
+          }
+        } catch (e) {
+          console.error("Failed to load shared canvas:", e);
+        }
+      });
+    }
 
     // 添加对象选择事件监听器
     const handleObjectSelected = (e: any) => {
@@ -715,10 +844,41 @@ export default function ExcalidrawClone() {
           </svg>
           素材库
         </button> */}
-        <button className="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white px-4 py-2 rounded-lg shadow-lg transition-all duration-200 flex items-center gap-2 font-medium hover:shadow-xl transform hover:-translate-y-0.5">
+        <button
+          className="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white px-4 py-2 rounded-lg shadow-lg transition-all duration-200 flex items-center gap-2 font-medium hover:shadow-xl transform hover:-translate-y-0.5"
+          onClick={() => setShareMenuVisible(!shareMenuVisible)}
+        >
           <Share2 size={18} />
           分享
         </button>
+        <button
+          className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-2 rounded-lg shadow-lg transition-all duration-200 flex items-center gap-2 font-medium hover:shadow-xl transform hover:-translate-y-0.5"
+          onClick={() => setIsAiOpen(!isAiOpen)}
+        >
+          AI侧栏
+        </button>
+        <UserAvatars users={connectedUsers} isConnected={isConnected} />
+        <ShareMenu
+          visible={shareMenuVisible}
+          onClose={() => setShareMenuVisible(false)}
+          onCopyImage={handleCopyImage}
+          onDownloadPng={handleExportPng}
+          onCopyLink={handleCopyLink}
+          onCopyJson={handleCopyJson}
+          isConnected={isConnected}
+          roomId={roomId}
+          onStartSession={() => {
+            const newRoomId = createRoom();
+            const url = window.location.origin + "/board?room=" + newRoomId;
+            navigator.clipboard.writeText(url);
+            // Update URL without reload
+            window.history.pushState(null, "", "/board?room=" + newRoomId);
+          }}
+          onStopSession={() => {
+            leaveRoom();
+            window.history.pushState(null, "", "/board");
+          }}
+        />
       </div>
 
       {/* 左下角缩放控制 */}
@@ -751,10 +911,12 @@ export default function ExcalidrawClone() {
               className="text-gray-600 group-hover:text-gray-800 transition-colors"
             />
           </button>
-          {/* <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-300 mx-1" />
           <button
             className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-md transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed"
-            title="撤销"
+            title="撤销 (Ctrl+Z)"
+            disabled={!canUndo}
+            onClick={undo}
           >
             <Undo
               size={16}
@@ -763,14 +925,15 @@ export default function ExcalidrawClone() {
           </button>
           <button
             className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-md transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed"
-            title="重做"
-            disabled
+            title="重做 (Ctrl+Shift+Z)"
+            disabled={!canRedo}
+            onClick={redo}
           >
             <Redo
               size={16}
               className="text-gray-600 group-hover:text-gray-800 transition-colors"
             />
-          </button> */}
+          </button>
         </div>
       </div>
 
@@ -794,6 +957,15 @@ export default function ExcalidrawClone() {
           ref={canvasRef}
           className="absolute inset-0 cursor-crosshair"
         />
+        {/* 新增：AI侧栏组件 */}
+        {isAiOpen && (
+          <AIAssistantPanel
+            onClose={() => setIsAiOpen(false)}
+            messages={sidebarMessages}
+            onSendMessage={handleSidebarSendMessage}
+            onSelectRegion={() => {}}
+          />
+        )}
 
         {/* 1. 右键菜单组件 */}
         <CanvasContextMenu
@@ -816,7 +988,7 @@ export default function ExcalidrawClone() {
           messages={aiDialog.messages}
           onClose={handleAiDialogClose}
           onInputChange={handleAiInputChange}
-          onSendMessage={handleAiSendMessage}
+          onSendMessage={handleAiDialogSendMessage}
         />
 
         {/* 新增：属性面板组件 */}
