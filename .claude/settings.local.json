@@ -11,7 +11,8 @@
       "Bash(npx kill-port:*)",
       "Bash(taskkill //F //FI 'WINDOWTITLE eq *yjs*')",
       "Bash(netstat -ano)",
-      "Bash(find D:Universitycodeexcalidraw-nextjs -maxdepth 1 -type f -name *.md -o -name *.txt -o -name .gitignore)"
+      "Bash(find D:Universitycodeexcalidraw-nextjs -maxdepth 1 -type f -name *.md -o -name *.txt -o -name .gitignore)",
+      "Bash(npx next:*)"
     ]
   }
 }

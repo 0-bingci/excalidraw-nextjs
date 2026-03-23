@@ -38,6 +38,23 @@
   transition-duration: 150ms;
 }
 
+/* Floating shape animations */
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-18px) rotate(5deg); }
+}
+@keyframes float-mid {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(-4deg); }
+}
+@keyframes float-fast {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.animate-float-slow { animation: float-slow 6s ease-in-out infinite; }
+.animate-float-mid  { animation: float-mid 4.5s ease-in-out infinite; }
+.animate-float-fast { animation: float-fast 3.5s ease-in-out infinite; }
+
 /* Ant Design customization */
 .ant-menu {
   font-size: 14px;
